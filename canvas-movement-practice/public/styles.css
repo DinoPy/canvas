@@ -3,28 +3,53 @@ body {
     overflow: hidden;
 }
 
-.ui {
+.overlay {
+    padding: 1.5em;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-250px, -100px);
+    width: 500px;
+    height: 200px;
+
+    background-color: rgba(0,0,0,0.75);
+    border-radius: 1em;
     display: flex;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    justify-content: space-between;
     gap: 1em;
-    height: 30px;
-    padding: 0 1em;
+
+    color: white;
 }
 
-
-
-progress {
-    color: "red";
+.playerName {
+    width: 90%;
+    height: 2em;
+    border-radius: 5px;
+    padding-left: 5px;
+    background-color: transparent;
+    color: white;
+    border: white 2px solid;
 }
 
-.score {
-    font-size: 20px;
-    font-weight: bold;
-    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
-
-    -webkit-user-select: none; /* Safari */
-    -ms-user-select: none; /* IE 10 and IE 11 */
-    user-select: none; /* Standard syntax */
+.playerName::placeholder {
+    color: white;
 }
 
+fieldset {
+    padding: 1em 2em;
+    border: white 2px solid;
+    border-radius : 5px;
+}
+
+.submitBtn {
+    background-color: #252525;
+    font-size: 1.5rem;
+    border-radius: 10px;
+    padding: .4em 1.5em;
+    border: none;
+    box-shadow: 7px -7px 5px #252525;
+
+    color: #FEFEFE;
+}

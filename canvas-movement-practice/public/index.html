@@ -8,7 +8,18 @@
     <link href="styles.css" rel="stylesheet">
 </head>
 
-<body>
+<body oncontextmenu="return false">
+    <form class="overlay">
+        <input id="playerName" class="playerName" type="text" name="name" value="" placeholder="Player name" minlength="2" maxlength="12" required>
+        <fieldset>
+            <legend> Select your keyboard layout </legend>
+            <label for="querty"> Querty </label>
+            <input id="keyLayout" type="radio" value="qwerty" name="keyLayout" checked>
+            <label for="colemak-dh"> Colemak-DH </label>
+            <input id="keyLayout" type="radio" value="colemak-dh" name="keyLayout">
+        </fieldset>
+        <button type="submit" class="submitBtn"> Submit </button>
+    </form>
     <canvas> </canvas>
 
     <script src="/socket.io/socket.io.js"></script>

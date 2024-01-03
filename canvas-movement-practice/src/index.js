@@ -2,7 +2,7 @@ import { createServer } from "http";
 import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
-import { parseMap } from "./utility.js";
+import { isAttackColiding, isSquareColiding, parseMap } from "./utility.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,17 +15,23 @@ app.use(cors());
 let players = {};
 let bullets = [];
 const MAP = await parseMap();
-const TICK_RATE = 30;
-const PLAYER_SPEED = 15;
+const TICK_RATE = 60;
+const PLAYER_HB_HEIGHT = 65;
+const PLAYER_HB_WIDTH = 45;
+const PLAYER_SPEED = 10;
 const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
-const HIT_POINTS = 20;
+const RANGE1DAMAGE = 15;
+const MELEE_ATTACK_1_TICK_DMG = 2;
 
 class Player {
-    constructor(id, x, y) {
+    constructor(id, x, y, name) {
         this.id = id;
-        this.x = x;
-        this.y = y;
+        this.name = name;
+        this.x = x; this.hbPaddingX = 25;
+        this.y = y; this.hbPaddingY = 10;
+        this.width = 96; this.hbWidth = 45;
+        this.height = 96; this.hbHeight = 65;
         this.keyControls = {
             up: false,
             down: false,
@@ -34,26 +40,82 @@ class Player {
         }
         this.life = 100;
         this.score = 0;
+        this.isAttacking = false;
+        this.state = "idle";
+        this.direction = "down";
+        this.bulletCount = 0;
+        this.critRate = 0.15;
+        this.dash = {
+            isDashing: false,
+            dashStart: null,
+            cooldown: 3000,
+            dashDuration: 250,
+        };
+    }
+
+    checkState() {
+        if (!this.keyControls.up && !this.keyControls.down && !this.keyControls.left && !this.keyControls.right && !this.isAttacking) this.state = "idle";
     }
 
     move() {
-        if (this.keyControls.up && this.y > 0)
-            this.y = Math.max(this.y - PLAYER_SPEED, 0);
-        else if (this.keyControls.down && this.y < MAP.length * TILE_SIZE)
-            this.y = Math.min(this.y + PLAYER_SPEED, MAP.length * TILE_SIZE - 96);
+        const playerSpeed = this.dash.isDashing ? PLAYER_SPEED * 3 : PLAYER_SPEED;
+        if (this.keyControls.up && this.y > 0) {
+            this.y = Math.max(this.y - playerSpeed, 0);
+            if (!this.isAttacking) this.state = "run";
+            this.direction = "up";
+        }
+        else if (this.keyControls.down && this.y < MAP.length * TILE_SIZE) {
+            this.y = Math.min(this.y + playerSpeed, MAP.length * TILE_SIZE - PLAYER_HB_WIDTH);
+            if (!this.isAttacking) this.state = "run";
+            this.direction = "down";
+        }
 
-        if (this.keyControls.left && this.x > 0)
-            this.x = Math.max(this.x - PLAYER_SPEED, 0);
-        else if (this.keyControls.right && this.x < MAP.length * TILE_SIZE)
-            this.x = Math.min(this.x + PLAYER_SPEED, MAP.length * TILE_SIZE - 96);
+        if (this.keyControls.left && this.x > 0) {
+            this.x = Math.max(this.x - playerSpeed, 0);
+            if (!this.isAttacking) this.state = "run";
+            this.direction = "left";
+        }
+        else if (this.keyControls.right && this.x < MAP.length * TILE_SIZE) {
+            this.x = Math.min(this.x + playerSpeed, MAP.length * TILE_SIZE - PLAYER_HB_WIDTH);
+            if (!this.isAttacking) this.state = "run";
+            this.direction = "right";
+        }
+
+    }
+
+    attackCheckHit() {
+        for (let p in players)
+            if (p !== this.id) {
+                if (this.isAttacking) {
+                    if (isAttackColiding(this, players[p]))
+                        players[p].life -= Math.random() < players[this.id].critRate ? MELEE_ATTACK_1_TICK_DMG * 1.5 : MELEE_ATTACK_1_TICK_DMG;
+
+                    if (players[p].life <= 0) {
+                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                            players[p].life = 100;
+                        players[p].score -= 25;
+                        players[this.id].score += 25;
+                    }
+                }
+            }
+
+    }
+
+    updateDashStatus () {
+        if (this.dash.isDashing) {
+            if (+new Date - this.dash.dashStart > this.dash.dashDuration) {
+                this.dash.isDashing = false;
+            }
+        }
     }
 
 }
 
 class Bullet {
     constructor(x, y, angle, ownerId) {
-        this.x = x;
-        this.y = y;
+        this.x = x; this.width = 16;
+        this.y = y; this.height = 11;
         this.angle = angle;
         this.ownerId = ownerId;
         this.life = 1000;
@@ -69,9 +131,16 @@ class Bullet {
     checkHit() {
         for (let p in players)
             if (p !== this.ownerId) {
-                const dist = getDistance(this.x, this.y, players[p].x, players[p].y);
-                if (dist < TILE_SIZE / 0.8) {
-                    players[p].life -= parseInt(Math.random() * HIT_POINTS);
+                if (isSquareColiding(
+                    {
+                        x: players[p].x + players[p].hbPaddingX,
+                        y: players[p].y + players[p].hbPaddingY,
+                        width: players[p].hbWidth,
+                        height: players[p].hbHeight
+                    },
+                    { x: this.x, y: this.y, width: this.width, height: this.height },
+                )) {
+                    players[p].life -= Math.random() < players[this.ownerId].critRate ? RANGE1DAMAGE * 1.5 : RANGE1DAMAGE;
                     this.life = 0;
                 }
 
@@ -88,11 +157,17 @@ class Bullet {
 
 async function main() {
     io.on("connection", (socket) => {
-        players[socket.id] = new Player(
-            socket.id,
-            parseInt(Math.random() * (MAP.length * TILE_SIZE)),
-            parseInt(Math.random() * (MAP.length * TILE_SIZE)),
-        );
+
+        socket.on("user-ready", (name) => {
+            players[socket.id] = new Player(
+                socket.id,
+                parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                name,
+            );
+            //players[socket.id].isReady = true;
+            //players[socket.id].name = name;
+        });
 
         socket.emit("map", MAP);
 
@@ -101,13 +176,32 @@ async function main() {
         });
 
         socket.on("shoot", (bullet) => {
-            bullets.push(
-                new Bullet(
-                    players[socket.id].x + 96/2,
-                    players[socket.id].y + 96/2,
-                    bullet.angle,
-                    socket.id
-                ));
+            if (players[socket.id]?.bulletCount < 1) {
+                players[socket.id].bulletCount++;
+                bullets.push(
+                    new Bullet(
+                        bullet.x,
+                        bullet.y,
+                        bullet.angle,
+                        socket.id
+                    ));
+            }
+        });
+
+        socket.on("dash", () => {
+            players[socket.id].dash.isDashing = true;
+            players[socket.id].dash.dashStart = +new Date;
+            console.log("triggerDash");
+        });
+
+        socket.on("attack-melee-1", () => {
+            players[socket.id].isAttacking = true;
+            players[socket.id].state = "attack";
+        });
+
+        socket.on("stop-attacking", (state) => {
+            players[socket.id].isAttacking = false;
+            players[socket.id].state = state;
         });
 
         socket.on("disconnect", () => {
@@ -124,14 +218,22 @@ async function main() {
 
     async function tick(delta, players) {
         for (let pl in players) {
+            players[pl].checkState();
             players[pl].move();
+            players[pl].attackCheckHit();
+            players[pl].updateDashStatus();
         }
 
         for (let i in bullets) {
             bullets[i].move(delta);
             bullets[i].checkHit();
         }
-        bullets = bullets.filter(b => b.life > 0);
+        bullets = bullets.filter(b => {
+            let isAlive = b.life > 0;
+            if (!isAlive && players[b.ownerId]?.bulletCount)
+                players[b.ownerId].bulletCount--;
+            return isAlive;
+        });
 
         io.emit("players-data", { pl: players, bl: bullets });
     };
@@ -140,7 +242,8 @@ async function main() {
     setInterval(() => {
         const now = Date.now();
         const delta = now - lastUpdate;
-        tick(delta, players)
+        if (Object.keys(players).length > 0)
+            tick(delta, players)
         lastUpdate = now;
     }, 1000 / TICK_RATE);
 }

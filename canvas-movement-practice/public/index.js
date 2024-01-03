@@ -2,15 +2,34 @@ const socket = io("ws://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
+
 const canvas = document.querySelector('canvas');
 const cx = canvas.getContext('2d');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-window.addEventListener("resize", () => {
+addEventListener("resize", () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+});
+
+const overlayEl = document.querySelector(".overlay");
+const playerNameEl = document.getElementById("playerName");
+let playerLayout = "colemak-dh";
+
+const keyboardMaps = {
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "f" },
+    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t" },
+}
+let ISREADY = false;
+
+addEventListener("submit", (e) => {
+    e.preventDefault();
+    playerLayout = document.querySelector(`input[name="keyLayout"]:checked`).value
+    overlayEl.style.display = "none";
+    ISREADY = true;
+    socket.emit("user-ready", playerNameEl.value);
 });
 
 //***************************************//
@@ -21,6 +40,8 @@ let keyControls = {
     down: false,
     left: false,
     right: false,
+    space: false,
+    dash: false,
 }
 let mouseControls = {
     down: false,
@@ -28,37 +49,45 @@ let mouseControls = {
     y: undefined,
 }
 window.addEventListener('keydown', (e) => {
-    if ((e.key === "w" || e.key === "ArrowUp") && !keyControls.up) {
+    if ((e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") && !keyControls.up) {
         keyControls.up = true;
-        socket.emit("player-movement", keyControls);
+        if (ISREADY) socket.emit("player-movement", keyControls);
     }
-    if ((e.key === "a" || e.key === "ArrowLeft") && !keyControls.left) {
+    if ((e.key === keyboardMaps[playerLayout].left || e.key === "ArrowLeft") && !keyControls.left) {
         keyControls.left = true;
-        socket.emit("player-movement", keyControls);
+        if (ISREADY) socket.emit("player-movement", keyControls);
     }
-    if ((e.key === "r" || e.key === "ArrowDown") && !keyControls.down) {
+    if ((e.key === keyboardMaps[playerLayout].down || e.key === "ArrowDown") && !keyControls.down) {
         keyControls.down = true;
-        socket.emit("player-movement", keyControls);
+        if (ISREADY) socket.emit("player-movement", keyControls);
     }
-    if ((e.key === "s" || e.key === "ArrowRight") && !keyControls.right) {
+    if ((e.key === keyboardMaps[playerLayout].right || e.key === "ArrowRight") && !keyControls.right) {
         keyControls.right = true;
-        socket.emit("player-movement", keyControls);
+        if (ISREADY) socket.emit("player-movement", keyControls);
+    }
+    if (e.key === " " && !keyControls.space) {
+        if (ISREADY) socket.emit("attack-melee-1");
+        keyControls.space = true;
+    }
+    if (e.key === keyboardMaps[playerLayout].dash && !keyControls.dash) {
+        keyControls.dash = true;
     }
 })
 window.addEventListener('keyup', (e) => {
-    if (e.key === "w" || e.key === "ArrowUp") keyControls.up = false;
-    if (e.key === "a" || e.key === "ArrowLeft") keyControls.left = false;
-    if (e.key === "r" || e.key === "ArrowDown") keyControls.down = false;
-    if (e.key === "s" || e.key === "ArrowRight") keyControls.right = false;
-    socket.emit("player-movement", keyControls);
+    if (e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") keyControls.up = false;
+    if (e.key === keyboardMaps[playerLayout].left || e.key === "ArrowLeft") keyControls.left = false;
+    if (e.key === keyboardMaps[playerLayout].down || e.key === "ArrowDown") keyControls.down = false;
+    if (e.key === keyboardMaps[playerLayout].right || e.key === "ArrowRight") keyControls.right = false;
+    if (e.key === " ") keyControls.space = false;
+    if (e.key === keyboardMaps[playerLayout].dash) keyControls.dash = false;
+    if (ISREADY) socket.emit("player-movement", keyControls);
 
 })
 window.addEventListener('click', (e) => {
-    mouseControls.down = true;
+    if (ISREADY) mouseControls.down = true;
     mouseControls.x = e.x;
     mouseControls.y = e.y;
 });
-
 
 //***************************************//
 //************** PLAYER *****************//
@@ -73,30 +102,49 @@ const warriorRun = new Image();
 warriorRun.src = "./assets/warrior_run.png";
 const warriorIdle = new Image();
 warriorIdle.src = "./assets/warrior_idle.png";
+const warriorAttack = new Image();
+warriorAttack.src = "./assets/warrior_attack.png";
+const dash = new Image();
+dash.src = "./assets/dash2.png";
 
 class Player {
-    gameFrame = 0;
     animationStates = {
-        "down": {
+        "run-down": {
             name: "down",
             frames: 15,
         },
-        "up": {
+        "run-up": {
             name: "up",
             frames: 15,
         },
-        "left": {
+        "run-left": {
             name: "left",
             frames: 15,
         },
-        "right": {
+        "run-right": {
             name: "right",
             frames: 15,
         },
         "idle": {
             name: "idle",
             frames: 30
-        }
+        },
+        "attack-down": {
+            name: "down",
+            frames: 15,
+        },
+        "attack-up": {
+            name: "up",
+            frames: 15,
+        },
+        "attack-left": {
+            name: "left",
+            frames: 15,
+        },
+        "attack-right": {
+            name: "right",
+            frames: 15,
+        },
     }
     constructor(id, x, y) {
         this.id = id;
@@ -106,84 +154,137 @@ class Player {
         this.height = 96;
         this.life = 100;
         this.score = 0;
-        this.movementDirection = "down";
+        this.direction = "down";
+        this.state = "idle";
+        this.isAttacking = false;
+        this.individualFrame = 0;
+        this.name = "Player";
+        this.dash = {
+            isDashing: false,
+            dashStart: null,
+            cooldown: 3000,
+            dashDuration: 300,
+        };
     }
 
-    draw(camX, camY, pi) {
-        if (keyControls.up || keyControls.down || keyControls.left || keyControls.right) {
-            if (keyControls.up) this.movementDirection = "up";
-            else if (keyControls.down) this.movementDirection = "down";
-            if (keyControls.left) this.movementDirection = "left";
-            else if (keyControls.right) this.movementDirection = "right";
-        } else {
-            this.movementDirection = "idle";
+    draw(camX, camY) {
+
+        if (this.dash.isDashing) {
+            cx.globalAlpha = 0.4;
+            cx.drawImage(dash,
+                this.x - (camX || 0) - 15,
+                this.y - (camY || 0) + 15,
+                60,
+                60
+            )
+            cx.globalAlpha = 1;
         }
-        let frameX = 100 * (gameFrame % this.animationStates[this.movementDirection].frames)
-        let frameY = 100 * Object.keys(this.animationStates).indexOf(this.movementDirection);
+
+        /*
+            * get a switch that will call a functon to run an animation.
+            * the switch is based on the state
+            * on each switch change we should reset the indidual frame under some condition.
+            *
+        */
+
+        let currentState = this.state === "idle" ? "idle" : `${this.state}-${this.direction}`
+        let ox = this.individualFrame % this.animationStates[currentState].frames;
+        let frameX = 100 * ox;
+        let frameY = 100 * Object.keys(this.animationStates).indexOf(`run-${this.direction}`);
+        if (this.isAttacking && ox === this.animationStates[currentState].frames - 1) {
+            this.isAttacking = false;
+            this.individualFrame = 0;
+            if (ISREADY) socket.emit("stop-attacking", this.state);
+        }
+
+        let spriteToUse = this.state === "attack" ? warriorAttack :
+            this.state === "run" ? warriorRun : warriorIdle;
 
         cx.drawImage(
-            this.movementDirection === "idle" ? warriorIdle : warriorRun,
-            frameX,
-            this.movementDirection === "idle" ? 0 : frameY,
-            100,
-            100,
+            spriteToUse,
+            frameX + 10,
+            (this.state === "idle" ? 0 : frameY) + 15,
+            80,
+            80,
             this.x - (camX || 0),
             this.y - (camY || 0),
             this.width,
             this.height,
         );
 
-        cx.font = "16px Monserat";
-        cx.fillText(
-            `Player ${pi}`,
-            this.x - (camX || 0) + this.width / 4,
-            this.y - (camY || 0),
-        )
-        this.gameFrame++;
+        //cx.fillStyle = "rgba(0,0,0,0.2)";
+        //cx.fillRect(this.x - (camX || 0) + 25, this.y - (camY || 0) + 10, 45, 65)
     }
+
 
     showStats(id) {
         // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
         if (id === socket.id) {
             const text = `${this.life}  Sc: ${this.score}`
-            cx.drawImage(
-                heartImg,
-                canvas.width - TILE_SIZE * 4,
-                0,
-                TILE_SIZE * 1.5,
-                TILE_SIZE
-            );
+            cx.drawImage(heartImg, canvas.width - TILE_SIZE * 4, 0, TILE_SIZE * 1.5, TILE_SIZE);
             cx.font = "16px Monserat";
-            cx.fillText(
-                text,
-                canvas.width - TILE_SIZE * 2.75,
-                TILE_SIZE / 2
-            );
+            cx.fillStyle = "black";
+            cx.fillText(text, canvas.width - TILE_SIZE * 2.75, TILE_SIZE / 2);
         }
     }
 
-    shot(camX, camY, offsets) {
-        const angle = Math.atan2(
-            mouseControls.y - offsets.offsetY,
-            mouseControls.x - offsets.offsetX
+    showName(camX, camY, pi) {
+        cx.fillStyle = "black";
+        cx.font = "16px Monserat";
+        cx.fillText(
+            this.name,
+            this.x - (camX || 0) + this.width / 4,
+            this.y - (camY || 0),
         )
-        mouseControls.down = false;
-        const bullet = {
-            angle: angle,
-            x: this.x - offsets.offsetX,
-            y: this.y - offsets.offsetY,
+    }
+
+    meleeAttack1(camX, camY) {
+        if (keyControls.space) {
+            if (this.individualFrame > 14 || (!this.isAttacking && this.individualFrame > 0)) this.individualFrame = 0;
+            this.isAttacking = true;
         }
-        console.log(this.x, this.y, bullet.x, bullet.y);
-        socket.emit("shoot", bullet);
+        //cx.fillStyle = "rgba(0,0,0,0.2)";
+        //cx.fillRect(this.x - (camX || 0) + 10, this.y - (camY || 0) + 65, 75, 30);
+    }
+
+    shot(camX, camY, offsets, id) {
+        // any positive alteration of the bullet source needs to be decreased from the mouse coordonates.
+        // the reason may be: that the bullet position is only altered visually and so
+
+        if (this.id === socket.id) {
+            const angle = Math.atan2(
+                mouseControls.y - offsets.offsetY - this.width / 2,
+                mouseControls.x - offsets.offsetX - this.height / 2
+            )
+            mouseControls.down = false;
+            const bullet = {
+                angle: angle,
+                x: this.x + this.width / 2,
+                y: this.y + this.height / 2,
+            }
+            socket.emit("shoot", bullet);
+        }
+    }
+
+    checkDashing() {
+        if (keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
+            socket.emit("dash");
+            keyControls.dash = false;
+        }
+
     }
 
     update(camX, camY, offsets, pi, id) {
         //************ MOUSE CONTROLS ****************/
         if (mouseControls.down)
             this.shot(camX, camY, offsets);
-
         this.draw(camX, camY, pi);
         this.showStats(id);
+        this.showName(camX, camY, pi);
+        this.meleeAttack1(camX, camY);
+        this.checkDashing();
+
+        this.individualFrame++;
     }
 }
 
@@ -195,10 +296,6 @@ let map = [[]];
 //*********************************************//
 //************** MULTIPLAYER *****************//
 //*******************************************//
-
-socket.on("connect", () => {
-    players[socket.id] = new Player(socket.id);
-});
 
 socket.on("map", (m) => {
     map = m;
@@ -213,6 +310,12 @@ socket.on("players-data", ({ pl, bl }) => {
         players[pl[p].id].y = pl[p].y;
         players[pl[p].id].life = pl[p].life;
         players[pl[p].id].score = pl[p].score;
+        players[pl[p].id].isAttacking = pl[p].isAttacking;
+        players[pl[p].id].state = pl[p].state;
+        players[pl[p].id].direction = pl[p].direction;
+        players[pl[p].id].name = pl[p].name;
+        players[pl[p].id].dash = pl[p].dash;
+
     }
 
     for (let p in players) {
@@ -265,7 +368,8 @@ const animate = () => {
         }
 
         for (let b of bullets) {
-            cx.drawImage(rock, b.x - cameraX, b.y - cameraY);
+            cx.drawImage(rock, b.x - cameraX, b.y - cameraY, 16, 11);
+            //cx.fillRect(b.x - cameraX, b.y - cameraY, 16, 11);
         }
 
         for (let p in players) {
@@ -281,3 +385,4 @@ const animate = () => {
 }
 
 animate();
+
