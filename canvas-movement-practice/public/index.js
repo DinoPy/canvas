@@ -214,6 +214,8 @@ class Player {
 
         //cx.fillStyle = "rgba(0,0,0,0.2)";
         //cx.fillRect(this.x - (camX || 0) + 25, this.y - (camY || 0) + 10, 45, 65)
+        //cx.fillStyle = "rgba(0,0,0,0.2)";
+        //cx.fillRect(this.x - (camX || 0), this.y - (camY || 0), this.width, this.height)
     }
 
 
@@ -221,20 +223,24 @@ class Player {
         // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
         if (id === socket.id) {
             const text = `${this.life}  Sc: ${this.score}`
-            cx.drawImage(heartImg, canvas.width - TILE_SIZE * 4, 0, TILE_SIZE * 1.5, TILE_SIZE);
-            cx.font = "16px Monserat";
+            cx.drawImage(heartImg, canvas.width - 200, 5, 60, 40);
+            cx.font = "300 30px Handjet";
             cx.fillStyle = "black";
-            cx.fillText(text, canvas.width - TILE_SIZE * 2.75, TILE_SIZE / 2);
+            cx.textAlign = "start";
+            cx.fillText(text, canvas.width - 150, 30);
         }
     }
 
-    showName(camX, camY, pi) {
+    showName(camX, camY) {
         cx.fillStyle = "black";
-        cx.font = "16px Monserat";
+        cx.font = "300 25px Handjet";
+        cx.font
+        cx.textAlign = "center";
         cx.fillText(
             this.name,
-            this.x - (camX || 0) + this.width / 4,
+            this.x - (camX || 0) + this.width / 2,
             this.y - (camY || 0),
+            this.width
         )
     }
 
@@ -267,25 +273,61 @@ class Player {
     }
 
     checkDashing() {
-        if (keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
+        if (this.id === socket.id && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
             keyControls.dash = false;
         }
 
     }
 
-    update(camX, camY, offsets, pi, id) {
+    update(camX, camY, offsets, id) {
         //************ MOUSE CONTROLS ****************/
         if (mouseControls.down)
             this.shot(camX, camY, offsets);
-        this.draw(camX, camY, pi);
+        this.draw(camX, camY);
         this.showStats(id);
-        this.showName(camX, camY, pi);
+        this.showName(camX, camY);
         this.meleeAttack1(camX, camY);
         this.checkDashing();
 
         this.individualFrame++;
     }
+}
+
+let damageNumbers = [];
+class GameNumbers {
+    constructor(user, amount, isCrit, type) {
+        this.user = user;
+        this.amount = amount;
+        this.isCrit = isCrit;
+        this.type = type;
+        this.at = +new Date;
+        this.duration = 700;
+        this.xOffset = (Math.random() - 0.5) * players[user].width;
+        this.yOffset = 0;
+    }
+
+    draw(camX, camY) {
+        cx.fillStyle = this.isCrit ? "red" : "white";
+        cx.font = `300 ${this.isCrit ? "35" : "25"}px Handjet`
+        cx.fillText(
+            this.amount,
+            players[this.user].x - (camX || 0) + players[this.user].width / 2 + this.xOffset,
+            players[this.user].y - (camY || 0) - 10 - this.yOffset,
+        );
+
+        this.yOffset += 2;
+    };
+
+    checkDuration () {
+        if (+new Date - this.at > this.duration)
+            damageNumbers.pop();
+    }
+
+    update(camX, camY) {
+        this.checkDuration();
+        this.draw(camX, camY);
+    };
 }
 
 const TILE_SIZE = 32;
@@ -296,6 +338,11 @@ let map = [[]];
 //*********************************************//
 //************** MULTIPLAYER *****************//
 //*******************************************//
+
+socket.on("connect", () => {
+    ISREADY = false;
+    overlayEl.style.display = "flex";
+});
 
 socket.on("map", (m) => {
     map = m;
@@ -327,12 +374,22 @@ socket.on("players-data", ({ pl, bl }) => {
 
 });
 
+socket.on("damage-taken", data => {
+    damageNumbers.push(new GameNumbers(socket.id, data.damage, data.isCrit, "damage"))
+    console.log(damageNumbers);
+});
+
+socket.on("damage-dealt", data => {
+    damageNumbers.push(new GameNumbers(data.to, data.damage, data.isCrit, "damage"))
+    console.log(damageNumbers);
+});
+
 //***************************************//
 //************** ANIMATION *****************//
 //***************************************//
 const TILES_IN_ROW = 8;
 const STAGGER_FRAME = 2;
-let stagger = 0, gameFrame = 0, playerIndex = 0;
+let stagger = 0, gameFrame = 0;
 const animate = () => {
     if ((stagger % STAGGER_FRAME) === 0) {
         cx.clearRect(0, 0, window.innerWidth, window.innerHeight);
@@ -373,11 +430,12 @@ const animate = () => {
         }
 
         for (let p in players) {
-            playerIndex++;
-            players[p].update(cameraX, cameraY, offsets, playerIndex, players[p].id);
-
+            players[p].update(cameraX, cameraY, offsets, players[p].id);
         }
-        playerIndex = 0;
+
+        for (let i in damageNumbers) {
+            damageNumbers[i].update(cameraX, cameraY);
+        }
         gameFrame++;
     }
     stagger += 1;

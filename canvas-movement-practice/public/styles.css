@@ -1,6 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Handjet:wght@300;400&display=swap');
 body {
     margin: 0;
     overflow: hidden;
+    font-family: 'Handjet', sans-serif !important;
+    font-weight: 300;
+    font-size: 1.3rem;
 }
 
 .overlay {
@@ -45,6 +49,7 @@ fieldset {
 
 .submitBtn {
     background-color: #252525;
+    font-family: 'Handjet', sans-serif !important;
     font-size: 1.5rem;
     border-radius: 10px;
     padding: .4em 1.5em;

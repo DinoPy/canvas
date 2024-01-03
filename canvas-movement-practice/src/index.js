@@ -23,6 +23,7 @@ const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
 const RANGE1DAMAGE = 15;
 const MELEE_ATTACK_1_TICK_DMG = 2;
+const BASE_CRIT_MULTIPIER = 1;
 
 class Player {
     constructor(id, x, y, name) {
@@ -45,6 +46,7 @@ class Player {
         this.direction = "down";
         this.bulletCount = 0;
         this.critRate = 0.15;
+        this.critDamage = 0.5;
         this.dash = {
             isDashing: false,
             dashStart: null,
@@ -87,8 +89,13 @@ class Player {
         for (let p in players)
             if (p !== this.id) {
                 if (this.isAttacking) {
-                    if (isAttackColiding(this, players[p]))
-                        players[p].life -= Math.random() < players[this.id].critRate ? MELEE_ATTACK_1_TICK_DMG * 1.5 : MELEE_ATTACK_1_TICK_DMG;
+                    if (isAttackColiding(this, players[p])) {
+                        const isCrit = Math.random() < players[this.id].critRate;
+                        const damage = isCrit ? MELEE_ATTACK_1_TICK_DMG * (BASE_CRIT_MULTIPIER + this.critDamage) : MELEE_ATTACK_1_TICK_DMG;
+                        players[p].life -= damage;
+                        io.to(p).emit("damage-taken", { isCrit, damage });
+                        io.to(this.id).emit("damage-dealt", { to: p, isCrit, damage, });
+                    }
 
                     if (players[p].life <= 0) {
                         players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
@@ -102,7 +109,7 @@ class Player {
 
     }
 
-    updateDashStatus () {
+    updateDashStatus() {
         if (this.dash.isDashing) {
             if (+new Date - this.dash.dashStart > this.dash.dashDuration) {
                 this.dash.isDashing = false;
@@ -140,7 +147,11 @@ class Bullet {
                     },
                     { x: this.x, y: this.y, width: this.width, height: this.height },
                 )) {
-                    players[p].life -= Math.random() < players[this.ownerId].critRate ? RANGE1DAMAGE * 1.5 : RANGE1DAMAGE;
+                    const isCrit = Math.random() < players[this.ownerId].critRate;
+                    const damage = isCrit ? RANGE1DAMAGE * (BASE_CRIT_MULTIPIER + players[this.ownerId].critDamage) : RANGE1DAMAGE;
+                    players[p].life -= damage;
+                    io.to(p).emit("damage-taken", {damage, isCrit});
+                    io.to(this.ownerId).emit("damage-dealt", { to: p, isCrit, damage });
                     this.life = 0;
                 }
 
