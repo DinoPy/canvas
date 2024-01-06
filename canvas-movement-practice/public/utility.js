@@ -24,3 +24,20 @@ const getMapOffset = (myPlayer, canW, canH, TILE_SIZE, mapLen) => {
     const offsetY = y + yy;
     return { offsetX, offsetY };
 }
+
+
+let to;
+to = (els, skill, time, interval) => {
+    els[skill]["dmg"].updateTextContents(time);
+
+    if (time <= 0) {
+        els[skill]["dmg"].addClass("hidden");
+        return;
+    };
+    setTimeout(() => {to(els,skill, time - interval, interval)}, interval)
+}
+const triggerCd = (els, skill, time, interval) => {
+    to(els, skill, time, interval);
+}
+
+

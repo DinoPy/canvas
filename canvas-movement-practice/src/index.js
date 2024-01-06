@@ -22,7 +22,7 @@ const PLAYER_SPEED = 10;
 const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
 const RANGE1DAMAGE = 15;
-const MELEE_ATTACK_1_TICK_DMG = 2;
+const MELEE_ATTACK_1_TICK_DMG = 25;
 const BASE_CRIT_MULTIPIER = 1;
 
 class Player {
@@ -53,6 +53,7 @@ class Player {
             cooldown: 3000,
             dashDuration: 250,
         };
+        this.attack1_alreadyHit = [];
     }
 
     checkState() {
@@ -67,7 +68,7 @@ class Player {
             this.direction = "up";
         }
         else if (this.keyControls.down && this.y < MAP.length * TILE_SIZE) {
-            this.y = Math.min(this.y + playerSpeed, MAP.length * TILE_SIZE - PLAYER_HB_WIDTH);
+            this.y = Math.min(this.y + playerSpeed, MAP.length * TILE_SIZE - this.height);
             if (!this.isAttacking) this.state = "run";
             this.direction = "down";
         }
@@ -78,7 +79,7 @@ class Player {
             this.direction = "left";
         }
         else if (this.keyControls.right && this.x < MAP.length * TILE_SIZE) {
-            this.x = Math.min(this.x + playerSpeed, MAP.length * TILE_SIZE - PLAYER_HB_WIDTH);
+            this.x = Math.min(this.x + playerSpeed, MAP.length * TILE_SIZE - this.width);
             if (!this.isAttacking) this.state = "run";
             this.direction = "right";
         }
@@ -88,8 +89,9 @@ class Player {
     attackCheckHit() {
         for (let p in players)
             if (p !== this.id) {
-                if (this.isAttacking) {
-                    if (isAttackColiding(this, players[p])) {
+                if (this.isAttacking && !this.attack1_alreadyHit.includes(p)) {
+                    if (isAttackColiding(this, players[p]) && !players[p].dash.isDashing) {
+                        this.attack1_alreadyHit.push(p);
                         const isCrit = Math.random() < players[this.id].critRate;
                         const damage = isCrit ? MELEE_ATTACK_1_TICK_DMG * (BASE_CRIT_MULTIPIER + this.critDamage) : MELEE_ATTACK_1_TICK_DMG;
                         players[p].life -= damage;
@@ -98,8 +100,8 @@ class Player {
                     }
 
                     if (players[p].life <= 0) {
-                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
-                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE) - this.width),
+                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE) - this.height),
                             players[p].life = 100;
                         players[p].score -= 25;
                         players[this.id].score += 25;
@@ -147,17 +149,19 @@ class Bullet {
                     },
                     { x: this.x, y: this.y, width: this.width, height: this.height },
                 )) {
-                    const isCrit = Math.random() < players[this.ownerId].critRate;
-                    const damage = isCrit ? RANGE1DAMAGE * (BASE_CRIT_MULTIPIER + players[this.ownerId].critDamage) : RANGE1DAMAGE;
-                    players[p].life -= damage;
-                    io.to(p).emit("damage-taken", {damage, isCrit});
-                    io.to(this.ownerId).emit("damage-dealt", { to: p, isCrit, damage });
+                    if (!players[p].dash.isDashing) {
+                        const isCrit = Math.random() < players[this.ownerId].critRate;
+                        const damage = isCrit ? RANGE1DAMAGE * (BASE_CRIT_MULTIPIER + players[this.ownerId].critDamage) : RANGE1DAMAGE;
+                        players[p].life -= damage;
+                        io.to(p).emit("damage-taken", { damage, isCrit });
+                        io.to(this.ownerId).emit("damage-dealt", { to: p, isCrit, damage });
+                    }
                     this.life = 0;
                 }
 
                 if (players[p].life <= 0) {
-                    players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
-                        players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE) - players[p].width),
+                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE) - players[p].height),
                         players[p].life = 100;
                     players[p].score -= 25;
                     players[this.ownerId].score += 25;
@@ -202,7 +206,6 @@ async function main() {
         socket.on("dash", () => {
             players[socket.id].dash.isDashing = true;
             players[socket.id].dash.dashStart = +new Date;
-            console.log("triggerDash");
         });
 
         socket.on("attack-melee-1", () => {
@@ -213,6 +216,7 @@ async function main() {
         socket.on("stop-attacking", (state) => {
             players[socket.id].isAttacking = false;
             players[socket.id].state = state;
+            players[socket.id].attack1_alreadyHit = [];
         });
 
         socket.on("disconnect", () => {

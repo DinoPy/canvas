@@ -2,6 +2,13 @@ const socket = io("ws://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
+import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
+
+const uiHandler = new GameUiHandler();
+uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
+uiHandler.setUpSkill("range", "./assets/rangeIcon.png");
+uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
+const els = uiHandler.returnSkillSlots();
 
 const canvas = document.querySelector('canvas');
 const cx = canvas.getContext('2d');
@@ -18,16 +25,13 @@ const overlayEl = document.querySelector(".overlay");
 const playerNameEl = document.getElementById("playerName");
 let playerLayout = "colemak-dh";
 
-const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "f" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t" },
-}
 let ISREADY = false;
 
 addEventListener("submit", (e) => {
     e.preventDefault();
     playerLayout = document.querySelector(`input[name="keyLayout"]:checked`).value
     overlayEl.style.display = "none";
+    uiHandler.showPlayerUi(playerLayout);
     ISREADY = true;
     socket.emit("user-ready", playerNameEl.value);
 });
@@ -106,45 +110,21 @@ const warriorAttack = new Image();
 warriorAttack.src = "./assets/warrior_attack.png";
 const dash = new Image();
 dash.src = "./assets/dash2.png";
+const fireBurning = new Image();
+fireBurning.src = "./assets/fire-burning.png";
 
 class Player {
     animationStates = {
-        "run-down": {
-            name: "down",
-            frames: 15,
-        },
-        "run-up": {
-            name: "up",
-            frames: 15,
-        },
-        "run-left": {
-            name: "left",
-            frames: 15,
-        },
-        "run-right": {
-            name: "right",
-            frames: 15,
-        },
-        "idle": {
-            name: "idle",
-            frames: 30
-        },
-        "attack-down": {
-            name: "down",
-            frames: 15,
-        },
-        "attack-up": {
-            name: "up",
-            frames: 15,
-        },
-        "attack-left": {
-            name: "left",
-            frames: 15,
-        },
-        "attack-right": {
-            name: "right",
-            frames: 15,
-        },
+        "run-down": { name: "down", frames: 15, },
+        "run-up": { name: "up", frames: 15, },
+        "run-left": { name: "left", frames: 15, },
+        "run-right": { name: "right", frames: 15, },
+        "idle": { name: "idle", frames: 30 },
+        "attack-down": { name: "down", frames: 15, },
+        "attack-up": { name: "up", frames: 15, },
+        "attack-left": { name: "left", frames: 15, },
+        "attack-right": { name: "right", frames: 15, },
+        "fire-burning": { name: "fire-burning", frame: 53 },
     }
     constructor(id, x, y) {
         this.id = id;
@@ -165,10 +145,10 @@ class Player {
             cooldown: 3000,
             dashDuration: 300,
         };
+        this.bulletCount = 0;
     }
 
     draw(camX, camY) {
-
         if (this.dash.isDashing) {
             cx.globalAlpha = 0.4;
             cx.drawImage(dash,
@@ -192,8 +172,7 @@ class Player {
         let frameX = 100 * ox;
         let frameY = 100 * Object.keys(this.animationStates).indexOf(`run-${this.direction}`);
         if (this.isAttacking && ox === this.animationStates[currentState].frames - 1) {
-            this.isAttacking = false;
-            this.individualFrame = 0;
+            els["melee"]["slot"].removeClass("onCd");
             if (ISREADY) socket.emit("stop-attacking", this.state);
         }
 
@@ -219,22 +198,29 @@ class Player {
     }
 
 
-    showStats(id) {
-        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-        if (id === socket.id) {
-            const text = `${this.life}  Sc: ${this.score}`
-            cx.drawImage(heartImg, canvas.width - 200, 5, 60, 40);
-            cx.font = "300 30px Handjet";
-            cx.fillStyle = "black";
-            cx.textAlign = "start";
-            cx.fillText(text, canvas.width - 150, 30);
-        }
+    showStats(id, camX, camY) {
+        const text = `${this.life}`
+        const statsOffset = this.name.length * 3;
+        cx.drawImage(
+            heartImg,
+            this.x - (camX || 0) + this.width / 2 + 4 + statsOffset,
+            this.y - (camY || 0) - 25,
+            60, 40
+        );
+        cx.font = "13px Rubik Doodle Shadow";
+        cx.fillStyle = "white";
+        cx.textAlign = "center";
+        cx.textAlign = "start";
+        cx.fillText(
+            text,
+            this.x - (camX || 0) + this.width / 2 + 22 + statsOffset,
+            this.y - (camY || 0) - 3,
+        );
     }
 
     showName(camX, camY) {
         cx.fillStyle = "black";
-        cx.font = "300 25px Handjet";
-        cx.font
+        cx.font = "300 22px Rubik Doodle Shadow";
         cx.textAlign = "center";
         cx.fillText(
             this.name,
@@ -246,8 +232,9 @@ class Player {
 
     meleeAttack1(camX, camY) {
         if (keyControls.space) {
-            if (this.individualFrame > 14 || (!this.isAttacking && this.individualFrame > 0)) this.individualFrame = 0;
+            if (this.individualFrame > 14 || (!this.isAttacking && this.individualFrame >= 0)) this.individualFrame = 0;
             this.isAttacking = true;
+            els["melee"]["slot"].addClass("onCd");
         }
         //cx.fillStyle = "rgba(0,0,0,0.2)";
         //cx.fillRect(this.x - (camX || 0) + 10, this.y - (camY || 0) + 65, 75, 30);
@@ -276,19 +263,45 @@ class Player {
         if (this.id === socket.id && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
             keyControls.dash = false;
+            this.dash.dashStart = +new Date;
+            uiHandler.triggerCd("dash", els);
         }
 
     }
 
-    update(camX, camY, offsets, id) {
+    updateUi(gameFrame) {
+        if (socket.id === this.id && gameFrame % 6 === 0) {
+            if (!this.dash.isDashing &&
+                this.dash.dashStart + this.dash.cooldown < +new Date) {
+                uiHandler.removeCd("dash", els)
+            } else {
+                uiHandler.triggerCd("dash", els);
+                uiHandler.updateCd("dash", (this.dash.cooldown / 1000 - Math.floor((+new Date - this.dash.dashStart) / 1000)), els);
+            }
+
+            if (!this.isAttacking) els["melee"]["slot"].removeClass("onCd");
+
+            if (this.bulletCount > 0) {
+                els["range"]["slot"].addClass("onCd");
+            } else {
+                els["range"]["slot"].removeClass("onCd");
+            }
+
+            const pls = Object.keys(players).map(p => players[p].name)
+            uiHandler.updatePlayers(pls);
+        }
+    }
+
+    update(camX, camY, offsets, id, gameFrame) {
         //************ MOUSE CONTROLS ****************/
         if (mouseControls.down)
             this.shot(camX, camY, offsets);
         this.draw(camX, camY);
-        this.showStats(id);
+        this.showStats(id, camX, camY);
         this.showName(camX, camY);
         this.meleeAttack1(camX, camY);
         this.checkDashing();
+        this.updateUi(gameFrame);
 
         this.individualFrame++;
     }
@@ -305,11 +318,12 @@ class GameNumbers {
         this.duration = 700;
         this.xOffset = (Math.random() - 0.5) * players[user].width;
         this.yOffset = 0;
+        this.bulletCount = 0;
     }
 
     draw(camX, camY) {
         cx.fillStyle = this.isCrit ? "red" : "white";
-        cx.font = `300 ${this.isCrit ? "35" : "25"}px Handjet`
+        cx.font = `300 ${this.isCrit ? "30" : "20"}px Rubik Doodle Shadow`
         cx.fillText(
             this.amount,
             players[this.user].x - (camX || 0) + players[this.user].width / 2 + this.xOffset,
@@ -319,7 +333,7 @@ class GameNumbers {
         this.yOffset += 2;
     };
 
-    checkDuration () {
+    checkDuration() {
         if (+new Date - this.at > this.duration)
             damageNumbers.pop();
     }
@@ -362,6 +376,7 @@ socket.on("players-data", ({ pl, bl }) => {
         players[pl[p].id].direction = pl[p].direction;
         players[pl[p].id].name = pl[p].name;
         players[pl[p].id].dash = pl[p].dash;
+        players[pl[p].id].bulletCount = pl[p].bulletCount;
 
     }
 
@@ -376,12 +391,10 @@ socket.on("players-data", ({ pl, bl }) => {
 
 socket.on("damage-taken", data => {
     damageNumbers.push(new GameNumbers(socket.id, data.damage, data.isCrit, "damage"))
-    console.log(damageNumbers);
 });
 
 socket.on("damage-dealt", data => {
     damageNumbers.push(new GameNumbers(data.to, data.damage, data.isCrit, "damage"))
-    console.log(damageNumbers);
 });
 
 //***************************************//
@@ -430,12 +443,13 @@ const animate = () => {
         }
 
         for (let p in players) {
-            players[p].update(cameraX, cameraY, offsets, players[p].id);
+            players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
         }
 
         for (let i in damageNumbers) {
             damageNumbers[i].update(cameraX, cameraY);
         }
+
         gameFrame++;
     }
     stagger += 1;

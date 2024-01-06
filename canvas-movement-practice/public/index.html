@@ -4,13 +4,14 @@
 <head>
     <title>Canvas Game</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=0.8">
     <link href="styles.css" rel="stylesheet">
 </head>
 
 <body oncontextmenu="return false">
     <form class="overlay">
-        <input id="playerName" class="playerName" type="text" name="name" value="" placeholder="Player name" minlength="2" maxlength="12" required>
+        <input id="playerName" class="playerName" type="text" name="name" value="" placeholder="Player name"
+            minlength="2" maxlength="12" required>
         <fieldset>
             <legend> Select your keyboard layout </legend>
             <label for="querty"> Querty </label>
@@ -20,10 +21,16 @@
         </fieldset>
         <button type="submit" class="submitBtn"> Submit </button>
     </form>
+
+    <div class="players-overlay hidden"> </div>
     <canvas> </canvas>
+    <div class="abilities-overlay">
+        <div class="abilities hidden" id="abilitiesEl">
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/utility.js"> </script>
+    <script src="utility.js"> </script>
     <script type="module" src="index.js"> </script>
 </body>
 
