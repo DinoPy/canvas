@@ -2,7 +2,7 @@ import { createServer } from "http";
 import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
-import { isAttackColiding, isSquareColiding, parseMap } from "./utility.js";
+import { isAttackColiding, isSquareColiding, parseMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,10 +14,9 @@ app.use(cors());
 
 let players = {};
 let bullets = [];
-const MAP = await parseMap();
+const MAP = await parseMap(0);
+const OBSTACLES = await parseMap(1);
 const TICK_RATE = 60;
-const PLAYER_HB_HEIGHT = 65;
-const PLAYER_HB_WIDTH = 45;
 const PLAYER_SPEED = 10;
 const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
@@ -39,7 +38,6 @@ class Player {
             left: false,
             right: false
         }
-        this.life = 100;
         this.score = 0;
         this.isAttacking = false;
         this.state = "idle";
@@ -50,10 +48,21 @@ class Player {
         this.dash = {
             isDashing: false,
             dashStart: null,
-            cooldown: 3000,
+            cooldown: 2500,
             dashDuration: 250,
         };
         this.attack1_alreadyHit = [];
+        this.playerStats = {
+            regen: {
+                lastRegen: +new Date,
+                regenAmount: 1,
+                regenInterval: 1000,
+            },
+            life: {
+                maxLife: 150,
+                currentLife: 100,
+            }
+        }
     }
 
     checkState() {
@@ -62,6 +71,8 @@ class Player {
 
     move() {
         const playerSpeed = this.dash.isDashing ? PLAYER_SPEED * 3 : PLAYER_SPEED;
+        let playerX = this.x;
+        let playerY = this.y;
         if (this.keyControls.up && this.y > 0) {
             this.y = Math.max(this.y - playerSpeed, 0);
             if (!this.isAttacking) this.state = "run";
@@ -72,6 +83,8 @@ class Player {
             if (!this.isAttacking) this.state = "run";
             this.direction = "down";
         }
+        if (isColidingWithEnvironment(OBSTACLES, { x: this.x + 27, y: this.y + 20, width: 41, height: 55 }))
+            this.y = playerY;
 
         if (this.keyControls.left && this.x > 0) {
             this.x = Math.max(this.x - playerSpeed, 0);
@@ -83,6 +96,8 @@ class Player {
             if (!this.isAttacking) this.state = "run";
             this.direction = "right";
         }
+        if (isColidingWithEnvironment(OBSTACLES, { x: this.x + 27, y: this.y + 20, width: 41, height: 55 }))
+            this.x = playerX;
 
     }
 
@@ -94,15 +109,16 @@ class Player {
                         this.attack1_alreadyHit.push(p);
                         const isCrit = Math.random() < players[this.id].critRate;
                         const damage = isCrit ? MELEE_ATTACK_1_TICK_DMG * (BASE_CRIT_MULTIPIER + this.critDamage) : MELEE_ATTACK_1_TICK_DMG;
-                        players[p].life -= damage;
+                        players[p].playerStats.life.currentLife -= damage;
                         io.to(p).emit("damage-taken", { isCrit, damage });
                         io.to(this.id).emit("damage-dealt", { to: p, isCrit, damage, });
                     }
 
-                    if (players[p].life <= 0) {
-                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE) - this.width),
-                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE) - this.height),
-                            players[p].life = 100;
+                    if (players[p].playerStats.life.currentLife <= 0) {
+                        const coords = generateRespawnCoords(OBSTACLES);
+                        players[p].x = coords.x;
+                        players[p].y = coords.y;
+                        players[p].playerStats.life.currentLife = 100;
                         players[p].score -= 25;
                         players[this.id].score += 25;
                     }
@@ -119,6 +135,15 @@ class Player {
         }
     }
 
+    triggerRegen() {
+        if (+new Date - this.playerStats.regen.lastRegen >
+            this.playerStats.regen.regenInterval &&
+            this.playerStats.life.currentLife <
+            this.playerStats.life.maxLife) {
+            this.playerStats.life.currentLife += this.playerStats.regen.regenAmount;
+            this.playerStats.regen.lastRegen = +new Date;
+        }
+    }
 }
 
 class Bullet {
@@ -135,6 +160,9 @@ class Bullet {
         this.x += Math.cos(this.angle) * BULLET_SPEED;
         this.y += Math.sin(this.angle) * BULLET_SPEED;
         this.life -= delta;
+
+        if (isColidingWithEnvironment(OBSTACLES, { x: this.x, y: this.y, width: 16, height: 11 }))
+            this.life = 0;
     }
 
     checkHit() {
@@ -152,17 +180,18 @@ class Bullet {
                     if (!players[p].dash.isDashing) {
                         const isCrit = Math.random() < players[this.ownerId].critRate;
                         const damage = isCrit ? RANGE1DAMAGE * (BASE_CRIT_MULTIPIER + players[this.ownerId].critDamage) : RANGE1DAMAGE;
-                        players[p].life -= damage;
+                        players[p].playerStats.life.currentLife -= damage;
                         io.to(p).emit("damage-taken", { damage, isCrit });
                         io.to(this.ownerId).emit("damage-dealt", { to: p, isCrit, damage });
                     }
                     this.life = 0;
                 }
 
-                if (players[p].life <= 0) {
-                        players[p].x = parseInt(Math.random() * (MAP.length * TILE_SIZE) - players[p].width),
-                            players[p].y = parseInt(Math.random() * (MAP.length * TILE_SIZE) - players[p].height),
-                        players[p].life = 100;
+                if (players[p].playerStats.life.currentLife <= 0) {
+                    const coords = generateRespawnCoords(OBSTACLES);
+                    players[p].x = coords.x;
+                    players[p].y = coords.y;
+                    players[p].playerStats.life.currentLife = 100;
                     players[p].score -= 25;
                     players[this.ownerId].score += 25;
                 }
@@ -172,19 +201,19 @@ class Bullet {
 
 async function main() {
     io.on("connection", (socket) => {
-
         socket.on("user-ready", (name) => {
+            const coords = generateRespawnCoords(OBSTACLES);
             players[socket.id] = new Player(
                 socket.id,
-                parseInt(Math.random() * (MAP.length * TILE_SIZE)),
-                parseInt(Math.random() * (MAP.length * TILE_SIZE)),
+                coords.x,
+                coords.y,
                 name,
             );
             //players[socket.id].isReady = true;
             //players[socket.id].name = name;
         });
 
-        socket.emit("map", MAP);
+        socket.emit("map", { MAP, OBSTACLES });
 
         socket.on("player-movement", (controls) => {
             players[socket.id].keyControls = controls;
@@ -237,6 +266,7 @@ async function main() {
             players[pl].move();
             players[pl].attackCheckHit();
             players[pl].updateDashStatus();
+            players[pl].triggerRegen();
         }
 
         for (let i in bullets) {

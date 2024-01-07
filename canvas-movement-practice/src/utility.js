@@ -1,17 +1,20 @@
 import tmx from "tmx-parser";
 
-export async function parseMap() {
+export async function parseMap(layer = 0) {
     const map = await new Promise((resolve, reject) => {
-        tmx.parseFile("./src/assets/map.tmx", (err, map) => {
+        tmx.parseFile("./src/assets/mapDesert.tmx", (err, map) => {
             if (err)
                 return reject(map);
-            const tiles = map.layers[0].tiles;
+            const tiles = map.layers[layer].tiles;
             let parsedMap = [];
             for (let row = 0; row < map.height; row++) {
                 let columns = [];
                 for (let col = 0; col < map.width; col++) {
                     const t = tiles[row * 100 + col];
-                    columns.push({ id: t.id, gid: t.gid });
+                    if (t)
+                        columns.push({ id: t.id, gid: t.gid });
+                    else
+                        columns.push(undefined);
                 }
                 parsedMap.push(columns);
             }
@@ -35,8 +38,8 @@ export const isSquareColiding = (sq1, sq2) => {
 
 export const isAttackColiding = (p1, p2) => {
     // we need 4 ifs for all directions.
-    if (p1.direction === "right" ) {
-        return isSquareColiding (
+    if (p1.direction === "right") {
+        return isSquareColiding(
             {
                 x: p1.x + p1.width / 2,
                 y: p1.y + 15,
@@ -50,8 +53,8 @@ export const isAttackColiding = (p1, p2) => {
                 height: p2.hbHeight,
             }
         );
-    } else if (p1.direction === "left" ) {
-        return isSquareColiding (
+    } else if (p1.direction === "left") {
+        return isSquareColiding(
             {
                 x: p1.x,
                 y: p1.y + 10,
@@ -65,8 +68,8 @@ export const isAttackColiding = (p1, p2) => {
                 height: p2.hbHeight,
             }
         );
-    } else if (p1.direction === "up" ) {
-        return isSquareColiding (
+    } else if (p1.direction === "up") {
+        return isSquareColiding(
             {
                 x: p1.x + 10,
                 y: p1.y,
@@ -80,8 +83,8 @@ export const isAttackColiding = (p1, p2) => {
                 height: p2.hbHeight,
             },
         );
-    } else if (p1.direction === "down" ) {
-        return isSquareColiding (
+    } else if (p1.direction === "down") {
+        return isSquareColiding(
             {
                 x: p1.x + 10,
                 y: p1.y + p2.hbHeight,
@@ -99,4 +102,33 @@ export const isAttackColiding = (p1, p2) => {
 
 }
 
+const TILE_SIZE = 32;
+export const isColidingWithEnvironment = (map, player) => {
+    for (let row = 0; row < map.length; row++) {
+        for (let col = 0, rl = map[0].length; col < rl; col++) {
+            if (!map[row][col])
+                continue;
+            if (isSquareColiding(
+                // very specific dimensions to the warrior animation.
+                player,
+                {
+                    x: col * TILE_SIZE,
+                    y: row * TILE_SIZE,
+                    width: TILE_SIZE,
+                    height: TILE_SIZE,
+                },
+            )) return true;
+        }
+    }
+    return false;
+}
 
+export const generateRespawnCoords = (map) => {
+    const x = parseInt(Math.random() * (map.length * TILE_SIZE - 96));
+    const y = parseInt(Math.random() * (map.length * TILE_SIZE - 96));
+
+    if (!isColidingWithEnvironment(map, { x, y, width: 96, height: 96 }))
+        return { x, y };
+    else
+        return generateRespawnCoords(map);
+}

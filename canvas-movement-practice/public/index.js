@@ -3,6 +3,7 @@ const socket = io("ws://localhost:5000");
 //************** SETUP *****************//
 //***************************************//
 import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
+import { AnimationHandler, Animation } from "./animationHandler.js";
 
 const uiHandler = new GameUiHandler();
 uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
@@ -93,13 +94,20 @@ window.addEventListener('click', (e) => {
     mouseControls.y = e.y;
 });
 
+document.body.addEventListener("blur", () => {
+    Object.keys(keyControls).map(k => keyControls[k] = false);
+    console.log(keyControls);
+});
+
 //***************************************//
 //************** PLAYER *****************//
 //***************************************//
 const rock = new Image();
 rock.src = "./assets/rock.png";
 const mapImg = new Image();
-mapImg.src = "./assets/FieldsTileset.png";
+mapImg.src = "./assets/Desert Tileset.png";
+const obstaclesImg = new Image();
+obstaclesImg.src = "./assets/Desert Tileset.png";
 const heartImg = new Image();
 heartImg.src = "./assets/heart.png";
 const warriorRun = new Image();
@@ -110,8 +118,17 @@ const warriorAttack = new Image();
 warriorAttack.src = "./assets/warrior_attack.png";
 const dash = new Image();
 dash.src = "./assets/dash2.png";
-const fireBurning = new Image();
-fireBurning.src = "./assets/fire-burning.png";
+
+const darkPoisonAnim = new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64);
+const iceSpellAnim = new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32);
+const arrowAnim = new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25);
+/*
+const animHandler = new AnimationHandler();
+animHandler.appendAnimation("warriorrun", warriorRunAnim);
+animHandler.appendAnimation("warrioridle", warriorIdleAnim);
+animHandler.appendAnimation("warriorattack", warriorAttackAnim);
+console.log(animHandler.returnAnimations());
+*/
 
 class Player {
     animationStates = {
@@ -126,10 +143,11 @@ class Player {
         "attack-right": { name: "right", frames: 15, },
         "fire-burning": { name: "fire-burning", frame: 53 },
     }
-    constructor(id, x, y) {
+    constructor(id, animations) {
         this.id = id;
-        this.x = x;
-        this.y = y;
+        this.cls = "warrior";
+        this.x = 0;
+        this.y = 0;
         this.width = 96;
         this.height = 96;
         this.life = 100;
@@ -146,9 +164,10 @@ class Player {
             dashDuration: 300,
         };
         this.bulletCount = 0;
+        this.animations = animations;
     }
 
-    draw(camX, camY) {
+    draw(camX, camY, gf) {
         if (this.dash.isDashing) {
             cx.globalAlpha = 0.4;
             cx.drawImage(dash,
@@ -160,43 +179,16 @@ class Player {
             cx.globalAlpha = 1;
         }
 
-        /*
-            * get a switch that will call a functon to run an animation.
-            * the switch is based on the state
-            * on each switch change we should reset the indidual frame under some condition.
-            *
-        */
-
-        let currentState = this.state === "idle" ? "idle" : `${this.state}-${this.direction}`
-        let ox = this.individualFrame % this.animationStates[currentState].frames;
-        let frameX = 100 * ox;
-        let frameY = 100 * Object.keys(this.animationStates).indexOf(`run-${this.direction}`);
-        if (this.isAttacking && ox === this.animationStates[currentState].frames - 1) {
+        if (this.isAttacking && this.animations[this.cls + this.state].hasFrameEnded()) {
             els["melee"]["slot"].removeClass("onCd");
             if (ISREADY) socket.emit("stop-attacking", this.state);
+            this.isAttacking = false;
+            if (keyControls.up || keyControls.down || keyControls.left || keyControls.right) this.state = "run";
+            else this.state = "idle";
         }
-
-        let spriteToUse = this.state === "attack" ? warriorAttack :
-            this.state === "run" ? warriorRun : warriorIdle;
-
-        cx.drawImage(
-            spriteToUse,
-            frameX + 10,
-            (this.state === "idle" ? 0 : frameY) + 15,
-            80,
-            80,
-            this.x - (camX || 0),
-            this.y - (camY || 0),
-            this.width,
-            this.height,
-        );
-
-        //cx.fillStyle = "rgba(0,0,0,0.2)";
-        //cx.fillRect(this.x - (camX || 0) + 25, this.y - (camY || 0) + 10, 45, 65)
-        //cx.fillStyle = "rgba(0,0,0,0.2)";
-        //cx.fillRect(this.x - (camX || 0), this.y - (camY || 0), this.width, this.height)
+        this.animations[this.cls + this.state].drawImage(this.x - (camX || 0), this.y - (camY || 0), gf, this.direction);
+        // Animation.drawPlayerSize(cx, this.x - (camX || 0), this.y - (camY || 0));
     }
-
 
     showStats(id, camX, camY) {
         const text = `${this.life}`
@@ -231,9 +223,7 @@ class Player {
     }
 
     meleeAttack1(camX, camY) {
-        if (keyControls.space) {
-            if (this.individualFrame > 14 || (!this.isAttacking && this.individualFrame >= 0)) this.individualFrame = 0;
-            this.isAttacking = true;
+        if (keyControls.space && !this.isAttacking) {
             els["melee"]["slot"].addClass("onCd");
         }
         //cx.fillStyle = "rgba(0,0,0,0.2)";
@@ -242,8 +232,7 @@ class Player {
 
     shot(camX, camY, offsets, id) {
         // any positive alteration of the bullet source needs to be decreased from the mouse coordonates.
-        // the reason may be: that the bullet position is only altered visually and so
-
+        // the reason may be: that the bullet position is only altered visually and so.
         if (this.id === socket.id) {
             const angle = Math.atan2(
                 mouseControls.y - offsets.offsetY - this.width / 2,
@@ -280,6 +269,7 @@ class Player {
             }
 
             if (!this.isAttacking) els["melee"]["slot"].removeClass("onCd");
+            else els["melee"]["slot"].addClass("onCd");
 
             if (this.bulletCount > 0) {
                 els["range"]["slot"].addClass("onCd");
@@ -296,7 +286,7 @@ class Player {
         //************ MOUSE CONTROLS ****************/
         if (mouseControls.down)
             this.shot(camX, camY, offsets);
-        this.draw(camX, camY);
+        this.draw(camX, camY, gameFrame);
         this.showStats(id, camX, camY);
         this.showName(camX, camY);
         this.meleeAttack1(camX, camY);
@@ -348,6 +338,7 @@ const TILE_SIZE = 32;
 let players = {};
 let bullets = [];
 let map = [[]];
+let obstacles = [[]];
 
 //*********************************************//
 //************** MULTIPLAYER *****************//
@@ -359,17 +350,23 @@ socket.on("connect", () => {
 });
 
 socket.on("map", (m) => {
-    map = m;
+    console.log(m);
+    map = m.MAP;
+    obstacles = m.OBSTACLES;
 });
 
 socket.on("players-data", ({ pl, bl }) => {
     for (let p in pl) {
         if (!players.hasOwnProperty(pl[p].id)) {
-            players[pl[p].id] = new Player(pl[p].id);
+            players[pl[p].id] = new Player(pl[p].id, {
+                "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
+                "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
+                "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 3, 100, 100, 96, 96),
+            });
         }
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;
-        players[pl[p].id].life = pl[p].life;
+        players[pl[p].id].life = pl[p].playerStats.life.currentLife;
         players[pl[p].id].score = pl[p].score;
         players[pl[p].id].isAttacking = pl[p].isAttacking;
         players[pl[p].id].state = pl[p].state;
@@ -400,59 +397,92 @@ socket.on("damage-dealt", data => {
 //***************************************//
 //************** ANIMATION *****************//
 //***************************************//
-const TILES_IN_ROW = 8;
-const STAGGER_FRAME = 2;
-let stagger = 0, gameFrame = 0;
+let angle = 0;
+
+addEventListener("click", (e) => {
+    angle = Math.atan2(
+        e.y - 400 - 32 / 2,
+        e.x - 400 - 48 / 2
+    )
+    console.log(angle);
+})
+
+
+
+
+const TILES_IN_ROW = 35;
+let gameFrame = 0;
 const animate = () => {
-    if ((stagger % STAGGER_FRAME) === 0) {
-        cx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    cx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
-        let cameraX = 0, cameraY = 0, offsets;
-        const myPlayer = players[socket.id];
-        if (myPlayer) {
-            offsets = getMapOffset(myPlayer, canvas.width, canvas.height, TILE_SIZE, map.length);
-            cameraX = parseInt(myPlayer.x - offsets.offsetX);
-            cameraY = parseInt(myPlayer.y - offsets.offsetY);
-        }
-
-        for (let row = 0; row < map.length; row++) {
-            for (let col = 0, rl = map[0].length; col < rl; col++) {
-                const { id } = map[row][col];
-                const imgRow = parseInt(id / TILES_IN_ROW);
-                const imgCol = id % TILES_IN_ROW;
-
-                // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-                cx.drawImage(
-                    mapImg,
-                    imgCol * TILE_SIZE,
-                    imgRow * TILE_SIZE,
-                    TILE_SIZE,
-                    TILE_SIZE,
-                    col * TILE_SIZE - cameraX,
-                    row * TILE_SIZE - cameraY,
-                    TILE_SIZE,
-                    TILE_SIZE
-                );
-
-            }
-        }
-
-        for (let b of bullets) {
-            cx.drawImage(rock, b.x - cameraX, b.y - cameraY, 16, 11);
-            //cx.fillRect(b.x - cameraX, b.y - cameraY, 16, 11);
-        }
-
-        for (let p in players) {
-            players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
-        }
-
-        for (let i in damageNumbers) {
-            damageNumbers[i].update(cameraX, cameraY);
-        }
-
-        gameFrame++;
+    let cameraX = 0, cameraY = 0, offsets;
+    const myPlayer = players[socket.id];
+    if (myPlayer) {
+        offsets = getMapOffset(myPlayer, canvas.width, canvas.height, TILE_SIZE, map.length);
+        cameraX = parseInt(myPlayer.x - offsets.offsetX);
+        cameraY = parseInt(myPlayer.y - offsets.offsetY);
     }
-    stagger += 1;
+
+    for (let row = 0; row < map.length; row++) {
+        for (let col = 0, rl = map[0].length; col < rl; col++) {
+            const { id } = map[row][col];
+            const imgRow = parseInt(id / TILES_IN_ROW);
+            const imgCol = id % TILES_IN_ROW;
+
+            // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+            cx.drawImage(
+                mapImg,
+                imgCol * TILE_SIZE,
+                imgRow * TILE_SIZE,
+                TILE_SIZE,
+                TILE_SIZE,
+                col * TILE_SIZE - cameraX,
+                row * TILE_SIZE - cameraY,
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+        }
+    }
+
+
+    for (let row = 0; row < obstacles.length; row++) {
+        for (let col = 0, rl = obstacles[0].length; col < rl; col++) {
+            if (!obstacles[row][col])
+                continue;
+            const { id } = obstacles[row][col];
+            const imgRow = parseInt(id / 35);
+            const imgCol = id % 35;
+            cx.drawImage(
+                obstaclesImg,
+                imgCol * TILE_SIZE,
+                imgRow * TILE_SIZE,
+                TILE_SIZE,
+                TILE_SIZE,
+                col * TILE_SIZE - cameraX,
+                row * TILE_SIZE - cameraY,
+                TILE_SIZE,
+                TILE_SIZE
+            );
+
+        }
+    }
+    for (let b of bullets) {
+        arrowAnim.drawRotated(b.x - cameraX, b.y - cameraY, gameFrame, b.angle);
+    }
+
+    for (let p in players) {
+        players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
+    }
+
+    for (let i in damageNumbers) {
+        damageNumbers[i].update(cameraX, cameraY);
+    }
+
+    gameFrame++;
+    darkPoisonAnim.drawImage(500 - cameraX, 500 - cameraY, gameFrame)
+
+    iceSpellAnim.drawRotated(400 - cameraX, 400 - cameraY, gameFrame, angle);
     requestAnimationFrame(animate);
 }
 
