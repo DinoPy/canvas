@@ -1,4 +1,5 @@
 import tmx from "tmx-parser";
+import fs from "fs";
 
 export async function parseMap(layer = 0) {
     const map = await new Promise((resolve, reject) => {
@@ -24,6 +25,17 @@ export async function parseMap(layer = 0) {
     });
 
     return map;
+}
+
+export function parseCsvMap(mapName) {
+    const map = fs.readFileSync(`./src/assets/${mapName}.csv`, "utf8");
+    const section = map.split("\n");
+    section.pop();
+    const map2D = section.map(s => s.split(",").map(n => {
+        const id = parseInt(n);
+        return id >= 0 ? {id} : undefined;
+    }));
+    return map2D;
 }
 
 export const isSquareColiding = (sq1, sq2) => {

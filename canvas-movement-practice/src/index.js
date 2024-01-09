@@ -2,7 +2,7 @@ import { createServer } from "http";
 import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
-import { isAttackColiding, isSquareColiding, parseMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.js";
+import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,8 +14,8 @@ app.use(cors());
 
 let players = {};
 let bullets = [];
-const MAP = await parseMap(0);
-const OBSTACLES = await parseMap(1);
+const MAP = parseCsvMap("mapDesert_Ground");
+const OBSTACLES = parseCsvMap("mapDesert_Objects");
 const TICK_RATE = 60;
 const PLAYER_SPEED = 10;
 const BULLET_SPEED = 25;

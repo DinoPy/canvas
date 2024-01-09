@@ -2,15 +2,6 @@ const socket = io("ws://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
-import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
-import { AnimationHandler, Animation } from "./animationHandler.js";
-
-const uiHandler = new GameUiHandler();
-uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
-uiHandler.setUpSkill("range", "./assets/rangeIcon.png");
-uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
-const els = uiHandler.returnSkillSlots();
-
 const canvas = document.querySelector('canvas');
 const cx = canvas.getContext('2d');
 
@@ -21,6 +12,15 @@ addEventListener("resize", () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 });
+
+import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
+import { AnimationHandler, Animation } from "./animationHandler.js";
+
+const uiHandler = new GameUiHandler(cx);
+uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
+uiHandler.setUpSkill("range", "./assets/rangeIcon.png");
+uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
+const els = uiHandler.returnSkillSlots();
 
 const overlayEl = document.querySelector(".overlay");
 const playerNameEl = document.getElementById("playerName");
@@ -191,23 +191,17 @@ class Player {
     }
 
     showStats(id, camX, camY) {
-        const text = `${this.life}`
-        const statsOffset = this.name.length * 3;
-        cx.drawImage(
-            heartImg,
-            this.x - (camX || 0) + this.width / 2 + 4 + statsOffset,
-            this.y - (camY || 0) - 25,
-            60, 40
-        );
-        cx.font = "13px Rubik Doodle Shadow";
-        cx.fillStyle = "white";
-        cx.textAlign = "center";
-        cx.textAlign = "start";
-        cx.fillText(
-            text,
-            this.x - (camX || 0) + this.width / 2 + 22 + statsOffset,
-            this.y - (camY || 0) - 3,
-        );
+        cx.globalAlpha = 0.6;
+        cx.fillStyle = "rgba(0,0,0,0.8)"
+        cx.fillRect(this.x - (camX || 0) - 2,
+            this.y - (camY || 0) + 3,
+            104, 9);
+        cx.fillStyle = "red";
+        cx.fillRect(this.x - (camX || 0),
+            this.y - (camY || 0) + 5,
+            (this.life / 150) * 100,
+            5);
+        cx.globalAlpha = 1;
     }
 
     showName(camX, camY) {
@@ -277,7 +271,7 @@ class Player {
                 els["range"]["slot"].removeClass("onCd");
             }
 
-            const pls = Object.keys(players).map(p => players[p].name)
+            const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life }))
             uiHandler.updatePlayers(pls);
         }
     }
@@ -361,7 +355,7 @@ socket.on("players-data", ({ pl, bl }) => {
             players[pl[p].id] = new Player(pl[p].id, {
                 "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
                 "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
-                "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 3, 100, 100, 96, 96),
+                "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 2, 100, 100, 96, 96),
             });
         }
         players[pl[p].id].x = pl[p].x;
@@ -487,4 +481,3 @@ const animate = () => {
 }
 
 animate();
-

@@ -1,7 +1,7 @@
 const abilitiesEl = document.querySelector("#abilitiesEl");
 const playersEl = document.querySelector(".players-overlay");
 export const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "Shift", melee: "Space", range: "Lb" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
     "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
 }
 
@@ -33,9 +33,10 @@ export class ElHandler {
 
 
 export class GameUiHandler {
-    constructor() {
+    constructor(cx) {
         this.skillSlotsEls = {};
         this.playerEls = {};
+        this.cx = cx;
     }
 
     showPlayerUi(layout) {
@@ -97,10 +98,18 @@ export class GameUiHandler {
     }
 
     setUpPlayerEl(name) {
-        const plEl = new ElHandler("span", "player-slot", name);
+        const plEl = new ElHandler("div", "player-slot", "");
+        const plName = new ElHandler("span", "plName", name);
+        plName.appendSelf(plEl.returnSelf());
+        const plStats = new ElHandler("span", "plStats", "");
+        const plHeartIcon = new ElHandler("img", "plHeartIcon", "", "./assets/heart.png")
+        plHeartIcon.appendSelf(plStats.returnSelf());
+        const plLife = new ElHandler("span", "plLife", "");
+        plLife.appendSelf(plStats.returnSelf());
+        plStats.appendSelf(plEl.returnSelf());
         plEl.appendSelf(playersEl);
 
-        this.appendPlayerEls(name, plEl);
+        this.appendPlayerEls(name, {el: plEl, name: plName, life: plLife, stats: plStats, heartIcon: plHeartIcon});
     }
 
     removePlayerEl(name) {
@@ -111,15 +120,18 @@ export class GameUiHandler {
     updatePlayers(players) {
         const playerNames = Object.keys(this.playerEls);
         for (let p of playerNames) {
-            if (!players.includes(p)) {
+            if (!players.find(i => i.name === p)) {
                 this.removePlayerEl(p)
                 continue;
             }
         }
 
-        for (let p of players)
-            if (!this.playerEls.hasOwnProperty(p))
-                this.setUpPlayerEl(p);
+        for (let p of players) {
+            if (!this.playerEls.hasOwnProperty(p.name))
+                this.setUpPlayerEl(p.name);
+            this.playerEls[p.name].life.updateTextContents(p.life);
+        }
+
     }
 
     returnPlayerEls() {

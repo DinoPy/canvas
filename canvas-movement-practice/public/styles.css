@@ -133,6 +133,9 @@ fieldset {
     top: 0;
     left: 0;
 
+    display: flex;
+    flex-wrap: wrap;
+
     user-select: none;
     background-color: rgba(0,0,0,0.5);
     padding: .2rem .5rem;
@@ -146,8 +149,34 @@ fieldset {
     padding: 0 10px;
     display: inline;
     border-right: 2px solid #252525;
+
+    display: flex;
+    align-items: center;
 }
 
 .player-slot:last-child {
     border: none;
+}
+
+ .plStats {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    position:relative;
+}
+
+.plName {
+    font-size: 20px;
+}
+
+.plHeartIcon {
+    height: 36px;
+    aspect-ratio: 10/6;
+}
+
+.plLife {
+    position: absolute;
+    font-size: .7em;
+    transform: translateY(-3px);
 }
