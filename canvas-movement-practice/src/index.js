@@ -14,15 +14,51 @@ app.use(cors());
 
 let players = {};
 let bullets = [];
+let buffs = [];
 const MAP = parseCsvMap("mapDesert_Ground");
 const OBSTACLES = parseCsvMap("mapDesert_Objects");
 const TICK_RATE = 60;
-const PLAYER_SPEED = 10;
 const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
-const RANGE1DAMAGE = 15;
-const MELEE_ATTACK_1_TICK_DMG = 25;
-const BASE_CRIT_MULTIPIER = 1;
+
+const BUFFS = {
+    minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 20, name: "Minor Swiftness", tier: 1 },
+    mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 15, name: "Medium Swiftness", tier: 2 },
+    majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 10, name: "Major Swiftness", tier: 3 },
+    rejuvenationMinor: { regen: { amount: 0, multiplier: 0.25 }, duration: 20, name: "Minor Rejuvenation", tier: 1 },
+    rejuvenationMedium: { regen: { amount: 0, multiplier: 0.50 }, duration: 15, name: "Medium Rejuvenation", tier: 2 },
+    rejuvenationMajor: { regen: { amount: 0, multiplier: 1 }, duration: 10, name: "Major Rejuvenation", tier: 3 },
+    minorFortification: { armor: { physical: 0, physicalMultiplier: 0.25 }, duration: 20, name: "Minor Fortification", tier: 1 },
+    mediumFortification: { armor: { physical: 0, physicalMultiplier: 0.50 }, duration: 15, name: "Medium Fortification", tier: 2 },
+    majorFortification: { armor: { physical: 0, physicalMultiplier: 1 }, duration: 10, name: "Major Fortification", tier: 3 },
+    minorWarding: { armor: { magic: 0, magicMultiplier: 0.25 }, duration: 20, name: "Minor Warding", tier: 1 },
+    mediumWarding: { armor: { magic: 0, magicMultiplier: 0.50 }, duration: 15, name: "Medium Warding", tier: 2 },
+    majorWarding: { armor: { magic: 0, magicMultiplier: 1 }, duration: 10, name: "Major Warding", tier: 3 },
+    minorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.2 }, duration: 20, name: "Minor Strengthening", tier: 1 },
+    mediumStrengthening: { attack: { physical: 0, physicalMultiplier: 0.4 }, duration: 15, name: "Medium Strengthening", tier: 2 },
+    majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 10, name: "Major Strengthening", tier: 3 },
+    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 20, name: "Minor Enchantment", tier: 1 },
+    mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 15, name: "Medium Enchantment", tier: 2 },
+    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 10, name: "Major Enchantment", tier: 3 },
+    minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 20, name: "Minor Precision", tier: 1 },
+    mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 15, name: "Medium Precision", tier: 2 },
+    majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 10, name: "Major Precision", tier: 3 },
+    minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 20, name: "Minor Devastation", tier: 1 },
+    mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 15, name: "Medium Devastation", tier: 2 },
+    majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 10, name: "Major Devastation", tier: 3 },
+}
+
+const spawnRandomBuff = () => {
+    const buffsList = Object.keys(BUFFS);
+    const randomBuff = buffsList[Math.floor(Math.random() * buffsList.length)];
+    const coords = generateRespawnCoords(OBSTACLES);
+
+    return {
+        x: coords.x,
+        y: coords.y,
+        buff: randomBuff,
+    };
+};
 
 class Player {
     constructor(id, x, y, name) {
@@ -55,14 +91,72 @@ class Player {
         this.playerStats = {
             regen: {
                 lastRegen: +new Date,
-                regenAmount: 1,
-                regenInterval: 1000,
+                amount: 1,
+                multiplier: 1,
+                interval: 1000,
             },
             life: {
-                maxLife: 150,
-                currentLife: 100,
-            }
+                max: 100,
+                multiplier: 1.5,
+                current: 100,
+            },
+            crit: {
+                physicalRate: 0.15,
+                physicalDamage: 0.5,
+                magicRate: 0.15,
+                magicDamage: 0.5,
+            },
+            attack: {
+                physical: 35,
+                physicalMultiplier: 1,
+                magic: 30,
+                magicMultiplier: 1,
+            },
+            armor: {
+                magic: 10,
+                magicMultiplier: 1,
+                physical: 10,
+                physicalMultiplier: 1,
+            },
+            movement: {
+                speed: 10,
+                multiplier: 1,
+            },
+        };
+        this.playerBuffStats = {
+            regen: {
+                amount: 0,
+                multiplier: 0,
+                interval: 0,
+            },
+            life: {
+                max: 0,
+                multiplier: 0,
+            },
+            crit: {
+                physicalRate: 0,
+                physicalDamage: 0,
+                magicRate: 0,
+                magicDamage: 0,
+            },
+            attack: {
+                physical: 0,
+                physicalMultiplier: 0,
+                magic: 0,
+                magicMultiplier: 0,
+            },
+            armor: {
+                magic: 0,
+                magicMultiplier: 0,
+                physical: 0,
+                physicalMultiplier: 0,
+            },
+            movement: {
+                speed: 0,
+                multiplier: 0,
+            },
         }
+        this.buffs = {};
     }
 
     checkState() {
@@ -70,7 +164,8 @@ class Player {
     }
 
     move() {
-        const playerSpeed = this.dash.isDashing ? PLAYER_SPEED * 3 : PLAYER_SPEED;
+        const currentSpeed = this.playerStats.movement.speed * (this.playerStats.movement.multiplier + this.playerBuffStats.movement.multiplier) + this.playerBuffStats.movement.speed;
+        const playerSpeed = this.dash.isDashing ? currentSpeed * 3 : currentSpeed;
         let playerX = this.x;
         let playerY = this.y;
         if (this.keyControls.up && this.y > 0) {
@@ -107,24 +202,20 @@ class Player {
                 if (this.isAttacking && !this.attack1_alreadyHit.includes(p)) {
                     if (isAttackColiding(this, players[p]) && !players[p].dash.isDashing) {
                         this.attack1_alreadyHit.push(p);
-                        const isCrit = Math.random() < players[this.id].critRate;
-                        const damage = isCrit ? MELEE_ATTACK_1_TICK_DMG * (BASE_CRIT_MULTIPIER + this.critDamage) : MELEE_ATTACK_1_TICK_DMG;
-                        players[p].playerStats.life.currentLife -= damage;
-                        io.to(p).emit("damage-taken", { isCrit, damage });
-                        io.to(this.id).emit("damage-dealt", { to: p, isCrit, damage, });
+                        const dmgDetails = Player.calculateDamage(players[this.id], players[p], "physical", 1);
+                        players[p].playerStats.life.current -= dmgDetails.damage;
+                        io.to(p).emit("damage-taken", dmgDetails);
+                        io.to(this.id).emit("damage-dealt", { to: p, ...dmgDetails });
                     }
 
-                    if (players[p].playerStats.life.currentLife <= 0) {
+                    if (players[p].playerStats.life.current <= 0) {
                         const coords = generateRespawnCoords(OBSTACLES);
                         players[p].x = coords.x;
                         players[p].y = coords.y;
-                        players[p].playerStats.life.currentLife = 100;
-                        players[p].score -= 25;
-                        players[this.id].score += 25;
+                        players[p].playerStats.life.current = players[p].playerStats.life.max;
                     }
                 }
             }
-
     }
 
     updateDashStatus() {
@@ -136,13 +227,57 @@ class Player {
     }
 
     triggerRegen() {
+        const maxLife = this.playerStats.life.max * (this.playerStats.life.multiplier + this.playerBuffStats.life.multiplier) + this.playerBuffStats.life.max;
         if (+new Date - this.playerStats.regen.lastRegen >
-            this.playerStats.regen.regenInterval &&
-            this.playerStats.life.currentLife <
-            this.playerStats.life.maxLife) {
-            this.playerStats.life.currentLife += this.playerStats.regen.regenAmount;
+            this.playerStats.regen.interval &&
+            this.playerStats.life.current <
+            maxLife) {
+            this.playerStats.life.current += (this.playerStats.regen.amount * (this.playerStats.regen.multiplier + this.playerBuffStats.regen.multiplier) + this.playerBuffStats.regen.amount);
+            this.playerStats.life.current = this.playerStats.life.current > maxLife ? maxLife : this.playerStats.life.current;
             this.playerStats.regen.lastRegen = +new Date;
         }
+    }
+
+    updateBuffs() {
+        const currentBuffs = Object.keys(this.buffs);
+        if (currentBuffs.length <= 0) return;
+        for (let i = 0; i < currentBuffs.length; i++) {
+            if (+new Date - this.buffs[currentBuffs[i]].since > this.buffs[currentBuffs[i]].duration * 1000)
+                Buff.remove(this, currentBuffs[i]);
+        }
+    }
+
+    checkColisionWithBuff() {
+        for (let index in buffs) {
+            if (isSquareColiding(
+                {
+                    x: this.x + this.hbPaddingX,
+                    y: this.y + this.hbPaddingY,
+                    width: this.hbWidth,
+                    height: this.hbHeight
+                },
+                { x: buffs[index].x, y: buffs[index].y, width:32, height: 32 },
+            )) {
+                Buff.applyToPlayer(players[this.id], buffs[index].type);
+                buffs.splice(index, 1)
+
+            }
+        }
+    }
+
+    static calculateDamage(dealer, receiver, type, attackMultiplier) {
+        const offenderCurrentCrit = dealer.playerStats.crit.physicalRate + dealer.playerBuffStats.crit.physicalRate;
+        const isCrit = Math.random() < offenderCurrentCrit;
+        let damage = parseInt((dealer.playerStats.attack.physical * (dealer.playerStats.attack.physicalMultiplier + dealer.playerBuffStats.attack.physicalMultiplier) + dealer.playerBuffStats.attack.physical) * attackMultiplier);
+        if (isCrit) {
+            const offenderCurrentCritDamage = dealer.playerStats.crit.physicalDamage + dealer.playerBuffStats.crit.physicalDamage;
+            damage = parseInt(damage + (damage * offenderCurrentCritDamage));
+        }
+
+        const receiverArmor = receiver.playerStats.armor[type] * (receiver.playerStats.armor[`${type}Multiplier`] +
+            receiver.playerBuffStats.armor[`${type}Multiplier`]) + receiver.playerBuffStats.armor[type]
+        damage = parseInt(damage - receiverArmor);
+        return { damage, isCrit };
     }
 }
 
@@ -178,25 +313,60 @@ class Bullet {
                     { x: this.x, y: this.y, width: this.width, height: this.height },
                 )) {
                     if (!players[p].dash.isDashing) {
-                        const isCrit = Math.random() < players[this.ownerId].critRate;
-                        const damage = isCrit ? RANGE1DAMAGE * (BASE_CRIT_MULTIPIER + players[this.ownerId].critDamage) : RANGE1DAMAGE;
-                        players[p].playerStats.life.currentLife -= damage;
-                        io.to(p).emit("damage-taken", { damage, isCrit });
-                        io.to(this.ownerId).emit("damage-dealt", { to: p, isCrit, damage });
+                        const dmgDetails = Player.calculateDamage(players[this.ownerId], players[p], "physical", 0.6);
+                        players[p].playerStats.life.current -= dmgDetails.damage;
+                        io.to(p).emit("damage-taken", dmgDetails);
+                        io.to(this.ownerId).emit("damage-dealt", { to: p, ...dmgDetails });
                     }
                     this.life = 0;
                 }
 
-                if (players[p].playerStats.life.currentLife <= 0) {
+                if (players[p].playerStats.life.current <= 0) {
                     const coords = generateRespawnCoords(OBSTACLES);
                     players[p].x = coords.x;
                     players[p].y = coords.y;
-                    players[p].playerStats.life.currentLife = 100;
-                    players[p].score -= 25;
-                    players[this.ownerId].score += 25;
+                    players[p].playerStats.life.current = 100;
                 }
             }
     }
+}
+
+class Buff {
+    constructor(x, y, type, duration, namee, tier) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.duration = duration;
+        this.createdAt = new Date;
+        this.name = namee;
+        this.tier = tier;
+    }
+
+    static applyProperties(action, p, buff) {
+        for (let prop in BUFFS[buff]) {
+            if (!p.playerBuffStats.hasOwnProperty(prop)) continue;
+            for (let innerProp in BUFFS[buff][prop]) {
+                if (!p.playerBuffStats[prop].hasOwnProperty(innerProp)) continue;
+                action === "apply" ?
+                    p.playerBuffStats[prop][innerProp] = parseFloat((p.playerBuffStats[prop][innerProp] + BUFFS[buff][prop][innerProp]).toFixed(2)) :
+                    p.playerBuffStats[prop][innerProp] = parseFloat((p.playerBuffStats[prop][innerProp] - BUFFS[buff][prop][innerProp]).toFixed(2));
+            }
+        }
+
+    }
+
+    static applyToPlayer(p, type) {
+        if (!p.buffs.hasOwnProperty(type))
+            this.applyProperties("apply", p, type);
+        p.buffs[type] = { since: +new Date, duration: BUFFS[type].duration, name: BUFFS[type].name, tier: BUFFS[type].tier };
+    }
+
+    static remove(p, type) {
+        this.applyProperties("remove", p, type);
+        delete p.buffs[type];
+    };
+
+
 }
 
 async function main() {
@@ -209,8 +379,6 @@ async function main() {
                 coords.y,
                 name,
             );
-            //players[socket.id].isReady = true;
-            //players[socket.id].name = name;
         });
 
         socket.emit("map", { MAP, OBSTACLES });
@@ -267,6 +435,8 @@ async function main() {
             players[pl].attackCheckHit();
             players[pl].updateDashStatus();
             players[pl].triggerRegen();
+            players[pl].updateBuffs();
+            players[pl].checkColisionWithBuff();
         }
 
         for (let i in bullets) {
@@ -280,8 +450,14 @@ async function main() {
             return isAlive;
         });
 
-        io.emit("players-data", { pl: players, bl: bullets });
+        io.emit("players-data", { pl: players, bl: bullets, bffs: buffs });
     };
+
+    setInterval(() => {
+        if (buffs.length >= 2) return;
+        const newBuff = spawnRandomBuff();
+        buffs.push(new Buff(newBuff.x, newBuff.y, newBuff.buff, BUFFS[newBuff.buff].duration, BUFFS[newBuff.buff].name, BUFFS[newBuff.buff].tier));
+    }, 2000);
 
     let lastUpdate = Date.now();
     setInterval(() => {

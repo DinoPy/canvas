@@ -1,4 +1,4 @@
-const socket = io("ws://localhost:5000");
+const socket = io("https://050e-188-24-175-39.ngrok-free.app");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
@@ -96,7 +96,6 @@ window.addEventListener('click', (e) => {
 
 document.body.addEventListener("blur", () => {
     Object.keys(keyControls).map(k => keyControls[k] = false);
-    console.log(keyControls);
 });
 
 //***************************************//
@@ -105,7 +104,7 @@ document.body.addEventListener("blur", () => {
 const rock = new Image();
 rock.src = "./assets/rock.png";
 const mapImg = new Image();
-mapImg.src = "./assets/Desert Tileset.png";
+mapImg.src = "./assets/Desert Tileset1.png";
 const obstaclesImg = new Image();
 obstaclesImg.src = "./assets/Desert Tileset.png";
 const heartImg = new Image();
@@ -122,13 +121,9 @@ dash.src = "./assets/dash2.png";
 const darkPoisonAnim = new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64);
 const iceSpellAnim = new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32);
 const arrowAnim = new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25);
-/*
-const animHandler = new AnimationHandler();
-animHandler.appendAnimation("warriorrun", warriorRunAnim);
-animHandler.appendAnimation("warrioridle", warriorIdleAnim);
-animHandler.appendAnimation("warriorattack", warriorAttackAnim);
-console.log(animHandler.returnAnimations());
-*/
+const water1Anim = new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50);
+const flame1Anim = new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600);
+const flame2Anim = new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220);
 
 class Player {
     animationStates = {
@@ -165,6 +160,8 @@ class Player {
         };
         this.bulletCount = 0;
         this.animations = animations;
+        this.buffs = {};
+        this.playerBuffStats = {};
     }
 
     draw(camX, camY, gf) {
@@ -306,6 +303,7 @@ class GameNumbers {
     }
 
     draw(camX, camY) {
+        if (!players[this.user]) return;
         cx.fillStyle = this.isCrit ? "red" : "white";
         cx.font = `300 ${this.isCrit ? "30" : "20"}px Rubik Doodle Shadow`
         cx.fillText(
@@ -331,6 +329,7 @@ class GameNumbers {
 const TILE_SIZE = 32;
 let players = {};
 let bullets = [];
+let buffs = [];
 let map = [[]];
 let obstacles = [[]];
 
@@ -349,7 +348,7 @@ socket.on("map", (m) => {
     obstacles = m.OBSTACLES;
 });
 
-socket.on("players-data", ({ pl, bl }) => {
+socket.on("players-data", ({ pl, bl, bffs }) => {
     for (let p in pl) {
         if (!players.hasOwnProperty(pl[p].id)) {
             players[pl[p].id] = new Player(pl[p].id, {
@@ -360,7 +359,7 @@ socket.on("players-data", ({ pl, bl }) => {
         }
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;
-        players[pl[p].id].life = pl[p].playerStats.life.currentLife;
+        players[pl[p].id].life = pl[p].playerStats.life.current;
         players[pl[p].id].score = pl[p].score;
         players[pl[p].id].isAttacking = pl[p].isAttacking;
         players[pl[p].id].state = pl[p].state;
@@ -368,7 +367,8 @@ socket.on("players-data", ({ pl, bl }) => {
         players[pl[p].id].name = pl[p].name;
         players[pl[p].id].dash = pl[p].dash;
         players[pl[p].id].bulletCount = pl[p].bulletCount;
-
+        players[pl[p].id].buffs = pl[p].buffs;
+        players[pl[p].id].playerBuffStats = pl[p].playerBuffStats;
     }
 
     for (let p in players) {
@@ -377,6 +377,7 @@ socket.on("players-data", ({ pl, bl }) => {
     }
 
     bullets = bl;
+    buffs = bffs;
 
 });
 
@@ -401,7 +402,7 @@ addEventListener("click", (e) => {
     console.log(angle);
 })
 
-
+const statsEl = document.querySelector("pre");
 
 
 const TILES_IN_ROW = 35;
@@ -467,6 +468,16 @@ const animate = () => {
 
     for (let p in players) {
         players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
+        if (p === socket.id) {
+            statsEl.innerText = JSON.stringify(players[p].buffs, null, 2);
+            statsEl.innerText += JSON.stringify(players[p].playerBuffStats, null, 2);
+            statsEl.style = "position: absolute";
+        }
+    }
+
+    for (let buff of buffs) {
+        cx.fillText(buff.name, buff.x - cameraX , buff.y - cameraY);
+        cx.fillRect(buff.x - cameraX, buff.y - cameraY + 15, 32, 32);
     }
 
     for (let i in damageNumbers) {
@@ -477,6 +488,9 @@ const animate = () => {
     darkPoisonAnim.drawImage(500 - cameraX, 500 - cameraY, gameFrame)
 
     iceSpellAnim.drawRotated(400 - cameraX, 400 - cameraY, gameFrame, angle);
+    water1Anim.drawRotated(300 - cameraX, 300 - cameraY, gameFrame, angle);
+    flame1Anim.drawRotated(400 - cameraX, 300 - cameraY, gameFrame, angle);
+    flame2Anim.drawImage(500 - cameraX, 300 - cameraY, gameFrame, angle);
     requestAnimationFrame(animate);
 }
 

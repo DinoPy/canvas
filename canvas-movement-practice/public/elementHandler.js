@@ -113,7 +113,7 @@ export class GameUiHandler {
     }
 
     removePlayerEl(name) {
-        this.playerEls[name].removeElement(playersEl);
+        this.playerEls[name].el.removeElement(playersEl);
         delete this.playerEls[name];
     }
 
