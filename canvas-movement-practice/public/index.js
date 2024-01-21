@@ -14,7 +14,7 @@ addEventListener("resize", () => {
 });
 
 import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
-import { AnimationHandler, Animation } from "./animationHandler.js";
+import { Animation } from "./animationHandler.js";
 
 const uiHandler = new GameUiHandler(cx);
 uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
@@ -34,7 +34,8 @@ addEventListener("submit", (e) => {
     overlayEl.style.display = "none";
     uiHandler.showPlayerUi(playerLayout);
     ISREADY = true;
-    socket.emit("user-ready", playerNameEl.value);
+    const avatarIndex = parseInt(Math.random() * 42);
+    socket.emit("user-ready", {name: playerNameEl.value, avatarIndex});
 });
 
 //***************************************//
@@ -101,22 +102,22 @@ document.body.addEventListener("blur", () => {
 //***************************************//
 //************** PLAYER *****************//
 //***************************************//
-const rock = new Image();
-rock.src = "./assets/rock.png";
+
+/////////// IMAGES //////////////
+let images = {};
 const mapImg = new Image();
 mapImg.src = "./assets/Desert Tileset1.png";
 const obstaclesImg = new Image();
 obstaclesImg.src = "./assets/Desert Tileset.png";
-const heartImg = new Image();
-heartImg.src = "./assets/heart.png";
-const warriorRun = new Image();
-warriorRun.src = "./assets/warrior_run.png";
-const warriorIdle = new Image();
-warriorIdle.src = "./assets/warrior_idle.png";
-const warriorAttack = new Image();
-warriorAttack.src = "./assets/warrior_attack.png";
-const dash = new Image();
-dash.src = "./assets/dash2.png";
+images["dash"] = new Image();
+images.dash.src = "./assets/dash2.png";
+images["frame3"] = new Image(); images["frame2"] = new Image(); images["frame1"] = new Image();
+images.frame3.src = "./assets/frames/gold.png"; images.frame2.src = "./assets/frames/blue.png"; images.frame1.src = "./assets/frames/green.png";
+images.fortification = new Image(); images.enchantment = new Image(); images.devastation = new Image();
+images.precision = new Image(); images.rejuvenation = new Image(); images.strengthening = new Image();
+images.swiftness = new Image(); images.warding = new Image();
+images.fortification.src = "./assets/icons/fortification.png"; images.enchantment.src = "./assets/icons/enchantment.png"; images.devastation.src = "./assets/icons/devastation.png"; images.precision.src = "./assets/icons/precision.png"; images.rejuvenation.src = "./assets/icons/rejuvenation.png"; images.strengthening.src = "./assets/icons/strengthening.png", images.swiftness.src = "./assets/icons/swiftness.png"; images.warding.src = "./assets/icons/warding.png";
+
 
 const darkPoisonAnim = new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64);
 const iceSpellAnim = new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32);
@@ -138,7 +139,7 @@ class Player {
         "attack-right": { name: "right", frames: 15, },
         "fire-burning": { name: "fire-burning", frame: 53 },
     }
-    constructor(id, animations) {
+    constructor(id, animations, avatarIndex, namee) {
         this.id = id;
         this.cls = "warrior";
         this.x = 0;
@@ -151,13 +152,14 @@ class Player {
         this.state = "idle";
         this.isAttacking = false;
         this.individualFrame = 0;
-        this.name = "Player";
+        this.name = namee || "Player";
         this.dash = {
             isDashing: false,
             dashStart: null,
             cooldown: 3000,
             dashDuration: 300,
         };
+        this.avatarIndex = avatarIndex || 1;
         this.bulletCount = 0;
         this.animations = animations;
         this.buffs = {};
@@ -167,7 +169,7 @@ class Player {
     draw(camX, camY, gf) {
         if (this.dash.isDashing) {
             cx.globalAlpha = 0.4;
-            cx.drawImage(dash,
+            cx.drawImage(images.dash,
                 this.x - (camX || 0) - 15,
                 this.y - (camY || 0) + 15,
                 60,
@@ -268,8 +270,12 @@ class Player {
                 els["range"]["slot"].removeClass("onCd");
             }
 
-            const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life }))
+            const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life, avatarIndex: players[p].avatarIndex }))
             uiHandler.updatePlayers(pls);
+
+            for (let buff in this.buffs) {
+                uiHandler.updateBuffDuration(this.name, this.buffs[buff]);
+            }
         }
     }
 
@@ -355,7 +361,7 @@ socket.on("players-data", ({ pl, bl, bffs }) => {
                 "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
                 "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
                 "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 2, 100, 100, 96, 96),
-            });
+            }, pl[p].avatarIndex, pl[p].name);
         }
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;
@@ -364,11 +370,10 @@ socket.on("players-data", ({ pl, bl, bffs }) => {
         players[pl[p].id].isAttacking = pl[p].isAttacking;
         players[pl[p].id].state = pl[p].state;
         players[pl[p].id].direction = pl[p].direction;
-        players[pl[p].id].name = pl[p].name;
         players[pl[p].id].dash = pl[p].dash;
         players[pl[p].id].bulletCount = pl[p].bulletCount;
         players[pl[p].id].buffs = pl[p].buffs;
-        players[pl[p].id].playerBuffStats = pl[p].playerBuffStats;
+        //players[pl[p].id].playerBuffStats = pl[p].playerBuffStats;
     }
 
     for (let p in players) {
@@ -387,6 +392,15 @@ socket.on("damage-taken", data => {
 
 socket.on("damage-dealt", data => {
     damageNumbers.push(new GameNumbers(data.to, data.damage, data.isCrit, "damage"))
+});
+
+socket.on("player-buff-collision", data => {
+    uiHandler.addBuff(data.name, data.buff);
+});
+
+socket.on("player-buff-expire", data => {
+    console.log("expired", data);
+    uiHandler.removeBuff(data.name, data.buffName);
 });
 
 //***************************************//
@@ -468,16 +482,21 @@ const animate = () => {
 
     for (let p in players) {
         players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
+        /*
         if (p === socket.id) {
             statsEl.innerText = JSON.stringify(players[p].buffs, null, 2);
             statsEl.innerText += JSON.stringify(players[p].playerBuffStats, null, 2);
             statsEl.style = "position: absolute";
         }
+        */
     }
 
     for (let buff of buffs) {
         cx.fillText(buff.name, buff.x - cameraX , buff.y - cameraY);
-        cx.fillRect(buff.x - cameraX, buff.y - cameraY + 15, 32, 32);
+        cx.drawImage(images[`frame${buff.tier}`], buff.x - cameraX, buff.y - cameraY);
+        const name = buff.name.split(" ")[1].toLowerCase();
+        cx.drawImage(images[name], buff.x - cameraX, buff.y - cameraY);
+
     }
 
     for (let i in damageNumbers) {

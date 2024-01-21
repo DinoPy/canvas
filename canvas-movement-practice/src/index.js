@@ -22,30 +22,30 @@ const BULLET_SPEED = 25;
 const TILE_SIZE = 32;
 
 const BUFFS = {
-    minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 20, name: "Minor Swiftness", tier: 1 },
-    mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 15, name: "Medium Swiftness", tier: 2 },
-    majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 10, name: "Major Swiftness", tier: 3 },
-    rejuvenationMinor: { regen: { amount: 0, multiplier: 0.25 }, duration: 20, name: "Minor Rejuvenation", tier: 1 },
-    rejuvenationMedium: { regen: { amount: 0, multiplier: 0.50 }, duration: 15, name: "Medium Rejuvenation", tier: 2 },
-    rejuvenationMajor: { regen: { amount: 0, multiplier: 1 }, duration: 10, name: "Major Rejuvenation", tier: 3 },
-    minorFortification: { armor: { physical: 0, physicalMultiplier: 0.25 }, duration: 20, name: "Minor Fortification", tier: 1 },
-    mediumFortification: { armor: { physical: 0, physicalMultiplier: 0.50 }, duration: 15, name: "Medium Fortification", tier: 2 },
-    majorFortification: { armor: { physical: 0, physicalMultiplier: 1 }, duration: 10, name: "Major Fortification", tier: 3 },
-    minorWarding: { armor: { magic: 0, magicMultiplier: 0.25 }, duration: 20, name: "Minor Warding", tier: 1 },
-    mediumWarding: { armor: { magic: 0, magicMultiplier: 0.50 }, duration: 15, name: "Medium Warding", tier: 2 },
-    majorWarding: { armor: { magic: 0, magicMultiplier: 1 }, duration: 10, name: "Major Warding", tier: 3 },
-    minorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.2 }, duration: 20, name: "Minor Strengthening", tier: 1 },
-    mediumStrengthening: { attack: { physical: 0, physicalMultiplier: 0.4 }, duration: 15, name: "Medium Strengthening", tier: 2 },
-    majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 10, name: "Major Strengthening", tier: 3 },
-    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 20, name: "Minor Enchantment", tier: 1 },
-    mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 15, name: "Medium Enchantment", tier: 2 },
-    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 10, name: "Major Enchantment", tier: 3 },
-    minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 20, name: "Minor Precision", tier: 1 },
-    mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 15, name: "Medium Precision", tier: 2 },
-    majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 10, name: "Major Precision", tier: 3 },
-    minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 20, name: "Minor Devastation", tier: 1 },
-    mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 15, name: "Medium Devastation", tier: 2 },
-    majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 10, name: "Major Devastation", tier: 3 },
+    minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 30, name: "Minor Swiftness", tier: 1 },
+    mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 22, name: "Medium Swiftness", tier: 2 },
+    majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 15, name: "Major Swiftness", tier: 3 },
+    rejuvenationMinor: { regen: { amount: 0, multiplier: 0.25 }, duration: 30, name: "Minor Rejuvenation", tier: 1 },
+    rejuvenationMedium: { regen: { amount: 0, multiplier: 0.50 }, duration: 22, name: "Medium Rejuvenation", tier: 2 },
+    rejuvenationMajor: { regen: { amount: 0, multiplier: 1 }, duration: 15, name: "Major Rejuvenation", tier: 3 },
+    minorFortification: { armor: { physical: 0, physicalMultiplier: 0.25 }, duration: 30, name: "Minor Fortification", tier: 1 },
+    mediumFortification: { armor: { physical: 0, physicalMultiplier: 0.50 }, duration: 22, name: "Medium Fortification", tier: 2 },
+    majorFortification: { armor: { physical: 0, physicalMultiplier: 1 }, duration: 15, name: "Major Fortification", tier: 3 },
+    minorWarding: { armor: { magic: 0, magicMultiplier: 0.25 }, duration: 30, name: "Minor Warding", tier: 1 },
+    mediumWarding: { armor: { magic: 0, magicMultiplier: 0.50 }, duration: 22, name: "Medium Warding", tier: 2 },
+    majorWarding: { armor: { magic: 0, magicMultiplier: 1 }, duration: 15, name: "Major Warding", tier: 3 },
+    minorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.2 }, duration: 30, name: "Minor Strengthening", tier: 1 },
+    mediumStrengthening: { attack: { physical: 0, physicalMultiplier: 0.4 }, duration: 22, name: "Medium Strengthening", tier: 2 },
+    majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 15, name: "Major Strengthening", tier: 3 },
+    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 30, name: "Minor Enchantment", tier: 1 },
+    mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 22, name: "Medium Enchantment", tier: 2 },
+    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 15, name: "Major Enchantment", tier: 3 },
+    minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 30, name: "Minor Precision", tier: 1 },
+    mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 22, name: "Medium Precision", tier: 2 },
+    majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 15, name: "Major Precision", tier: 3 },
+    minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 30, name: "Minor Devastation", tier: 1 },
+    mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 22, name: "Medium Devastation", tier: 2 },
+    majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
 }
 
 const spawnRandomBuff = () => {
@@ -61,9 +61,10 @@ const spawnRandomBuff = () => {
 };
 
 class Player {
-    constructor(id, x, y, name) {
+    constructor(id, x, y, name, avatarIndex) {
         this.id = id;
         this.name = name;
+        this.avatarIndex = avatarIndex;
         this.x = x; this.hbPaddingX = 25;
         this.y = y; this.hbPaddingY = 10;
         this.width = 96; this.hbWidth = 45;
@@ -79,8 +80,6 @@ class Player {
         this.state = "idle";
         this.direction = "down";
         this.bulletCount = 0;
-        this.critRate = 0.15;
-        this.critDamage = 0.5;
         this.dash = {
             isDashing: false,
             dashStart: null,
@@ -242,8 +241,10 @@ class Player {
         const currentBuffs = Object.keys(this.buffs);
         if (currentBuffs.length <= 0) return;
         for (let i = 0; i < currentBuffs.length; i++) {
-            if (+new Date - this.buffs[currentBuffs[i]].since > this.buffs[currentBuffs[i]].duration * 1000)
+            if (+new Date - this.buffs[currentBuffs[i]].since > this.buffs[currentBuffs[i]].duration * 1000) {
+                io.emit("player-buff-expire", { name: this.name, buffName: this.buffs[currentBuffs[i]].name })
                 Buff.remove(this, currentBuffs[i]);
+            }
         }
     }
 
@@ -256,11 +257,10 @@ class Player {
                     width: this.hbWidth,
                     height: this.hbHeight
                 },
-                { x: buffs[index].x, y: buffs[index].y, width:32, height: 32 },
+                { x: buffs[index].x, y: buffs[index].y, width: 32, height: 32 },
             )) {
                 Buff.applyToPlayer(players[this.id], buffs[index].type);
                 buffs.splice(index, 1)
-
             }
         }
     }
@@ -356,8 +356,13 @@ class Buff {
     }
 
     static applyToPlayer(p, type) {
-        if (!p.buffs.hasOwnProperty(type))
+        if (!p.buffs.hasOwnProperty(type)) {
             this.applyProperties("apply", p, type);
+            io.emit("player-buff-collision", {
+                name: p.name,
+                buff: { name: BUFFS[type].name, tier: BUFFS[type].tier }
+            })
+        }
         p.buffs[type] = { since: +new Date, duration: BUFFS[type].duration, name: BUFFS[type].name, tier: BUFFS[type].tier };
     }
 
@@ -369,22 +374,37 @@ class Buff {
 
 }
 
+const resolveDupeName = (name, index) => {
+    let currName = index === 1 ? name : name + index;
+    console.log(currName);
+    const sameNameCount = Object.keys(players).filter(id => players[id].name === currName);
+    if (sameNameCount.length === 0)
+        return currName;
+    else {
+        index += 1;
+        return resolveDupeName(name, index);
+    }
+
+}
+
 async function main() {
     io.on("connection", (socket) => {
-        socket.on("user-ready", (name) => {
+        socket.on("user-ready", (data) => {
             const coords = generateRespawnCoords(OBSTACLES);
             players[socket.id] = new Player(
                 socket.id,
                 coords.x,
                 coords.y,
-                name,
+                resolveDupeName(data.name, 1),
+                data.avatarIndex
             );
         });
 
         socket.emit("map", { MAP, OBSTACLES });
 
         socket.on("player-movement", (controls) => {
-            players[socket.id].keyControls = controls;
+            if (players[socket.id])
+                players[socket.id].keyControls = controls;
         });
 
         socket.on("shoot", (bullet) => {
@@ -457,7 +477,7 @@ async function main() {
         if (buffs.length >= 2) return;
         const newBuff = spawnRandomBuff();
         buffs.push(new Buff(newBuff.x, newBuff.y, newBuff.buff, BUFFS[newBuff.buff].duration, BUFFS[newBuff.buff].name, BUFFS[newBuff.buff].tier));
-    }, 2000);
+    }, 20000);
 
     let lastUpdate = Date.now();
     setInterval(() => {

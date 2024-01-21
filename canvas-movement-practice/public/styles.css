@@ -168,6 +168,7 @@ fieldset {
 
 .plName {
     font-size: 20px;
+    align-self: center;
 }
 
 .plHeartIcon {
@@ -185,4 +186,48 @@ fieldset {
     position: absolute;
     right: 0;
     bottom: 0;
+}
+
+.player-avatar {
+    width: 60px;
+    margin-right: 1em;
+}
+
+.plElRightHalf {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+}
+
+.plElUpperQuarter {
+    display: flex;
+    align-self: flex-start;
+}
+
+.buffsEl {
+    display: flex;
+}
+
+.buffContainer {
+    position: relative;
+}
+
+.buffFrame {
+    position: absolute;
+    left: 0;
+}
+
+.buffIcon {
+    position: relative;
+}
+
+.buffDuration {
+    font-size: 12px;
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    text-align: center;
+    width: 100%;
+    background-color: rgba(0,0,0, 0.7);
 }

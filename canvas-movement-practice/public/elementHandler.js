@@ -20,6 +20,7 @@ export class ElHandler {
 
     appendSelf(el) { el.append(this.el); }
     removeElement(el) { el.removeChild(this.el); }
+    removeSelf() { this.el.remove() };
 
     returnSelf() { return this.el; }
 
@@ -33,10 +34,11 @@ export class ElHandler {
 
 
 export class GameUiHandler {
-    constructor(cx) {
+    constructor(cx, images) {
         this.skillSlotsEls = {};
         this.playerEls = {};
         this.cx = cx;
+        this.images = images;
     }
 
     showPlayerUi(layout) {
@@ -97,19 +99,28 @@ export class GameUiHandler {
         this.playerEls = Object.assign(this.playerEls, { [name]: obj });
     }
 
-    setUpPlayerEl(name) {
+    setUpPlayerEl(name, avatarIndex) {
         const plEl = new ElHandler("div", "player-slot", "");
+        const avatarEl = new ElHandler("img", "player-avatar", "", `./assets/avatars/con${avatarIndex}.png`);
+        avatarEl.appendSelf(plEl.returnSelf());
+        const rightContainerEl = new ElHandler("div", "plElRightHalf", "");
+        const upperQuarterEl = new ElHandler("div", "plElUpperQuarter", "");
+        const buffsEl = new ElHandler("div", "buffsEl", "");
         const plName = new ElHandler("span", "plName", name);
-        plName.appendSelf(plEl.returnSelf());
+        plName.appendSelf(upperQuarterEl.returnSelf());
         const plStats = new ElHandler("span", "plStats", "");
         const plHeartIcon = new ElHandler("img", "plHeartIcon", "", "./assets/heart.png")
         plHeartIcon.appendSelf(plStats.returnSelf());
         const plLife = new ElHandler("span", "plLife", "");
         plLife.appendSelf(plStats.returnSelf());
-        plStats.appendSelf(plEl.returnSelf());
+        plStats.appendSelf(upperQuarterEl.returnSelf());
+
+        upperQuarterEl.appendSelf(rightContainerEl.returnSelf());
+        buffsEl.appendSelf(rightContainerEl.returnSelf());
+        rightContainerEl.appendSelf(plEl.returnSelf());
         plEl.appendSelf(playersEl);
 
-        this.appendPlayerEls(name, {el: plEl, name: plName, life: plLife, stats: plStats, heartIcon: plHeartIcon});
+        this.appendPlayerEls(name, {el: plEl, name: plName, life: plLife, stats: plStats, heartIcon: plHeartIcon, buffs: buffsEl, durationEls: {}});
     }
 
     removePlayerEl(name) {
@@ -128,7 +139,7 @@ export class GameUiHandler {
 
         for (let p of players) {
             if (!this.playerEls.hasOwnProperty(p.name))
-                this.setUpPlayerEl(p.name);
+                this.setUpPlayerEl(p.name, p.avatarIndex);
             this.playerEls[p.name].life.updateTextContents(p.life);
         }
 
@@ -138,5 +149,34 @@ export class GameUiHandler {
         return this.playerEls;
     }
 
+    addBuff(p, buff) {
+        const frames = {1: "green.png", 2: "blue.png", 3: "gold.png"};
+        const buffContainerEl = new ElHandler ("div", "buffContainer", "");
+        const buffFrameEl = new ElHandler("img", "buffFrame", "",`./assets/frames/${frames[buff.tier]}`);
+        const name = buff.name.split(" ")[1].toLowerCase();
+        const buffIconEl = new ElHandler("img", "buffIcon","",  `./assets/icons/${name}.png`);
+        const buffDurationEl = new ElHandler("span", "buffDuration", "");
+
+
+        buffFrameEl.appendSelf(buffContainerEl.returnSelf());
+        buffIconEl.appendSelf(buffContainerEl.returnSelf());
+        buffDurationEl.appendSelf(buffContainerEl.returnSelf());
+
+        buffContainerEl.appendSelf(this.playerEls[p].buffs.returnSelf());
+        this.playerEls[p].durationEls[buff.name] = {
+            container: buffContainerEl,
+            duration: buffDurationEl,
+        }
+    }
+
+    removeBuff(p, buffName) {
+        this.playerEls[p].durationEls[buffName].container.removeSelf();
+        delete this.playerEls[p].durationEls[buffName];
+    }
+
+    updateBuffDuration(pName, buff) {
+        const timeLeft = buff.duration - parseInt((+new Date - buff.since)/1000);
+        this.playerEls[pName].durationEls[buff.name].duration.updateTextContents(timeLeft);
+    }
 }
 
