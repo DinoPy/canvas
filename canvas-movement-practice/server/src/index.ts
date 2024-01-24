@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import {Server} from "socket.io";
 
-import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.js";
+import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.ts";
 
 const app = express();
 const httpServer = createServer(app);
