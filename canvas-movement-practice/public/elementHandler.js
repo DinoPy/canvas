@@ -175,6 +175,7 @@ export class GameUiHandler {
     }
 
     updateBuffDuration(pName, buff) {
+        if (!this.playerEls[pName].durationEls[buff.name]?.duration) return;
         const timeLeft = buff.duration - parseInt((+new Date - buff.since)/1000);
         this.playerEls[pName].durationEls[buff.name].duration.updateTextContents(timeLeft);
     }

@@ -1,7 +1,8 @@
-import { createServer } from "http";
+import {createServer} from "http";
 import express from "express";
 import cors from "cors";
-import { Server } from "socket.io";
+import {Server} from "socket.io";
+
 import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.js";
 
 const app = express();
@@ -118,7 +119,7 @@ class Player {
                 physicalMultiplier: 1,
             },
             movement: {
-                speed: 10,
+                speed: 8,
                 multiplier: 1,
             },
         };

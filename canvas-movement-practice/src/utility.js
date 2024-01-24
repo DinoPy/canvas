@@ -1,4 +1,3 @@
-import tmx from "tmx-parser";
 import fs from "fs";
 
 export async function parseMap(layer = 0) {
@@ -38,7 +37,7 @@ export function parseCsvMap(mapName) {
     return map2D;
 }
 
-export const isSquareColiding = (sq1, sq2) => {
+ export const isSquareColiding = (sq1, sq2) => {
     if (sq1.x + sq1.width + sq2.width > sq2.x + sq2.width &&
         sq1.x <= sq2.x + sq2.width &&
         sq1.y + sq1.height + sq2.height >= sq2.y + sq2.height &&
@@ -144,3 +143,4 @@ export const generateRespawnCoords = (map) => {
     else
         return generateRespawnCoords(map);
 }
+
