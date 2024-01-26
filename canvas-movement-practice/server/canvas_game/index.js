@@ -1,4 +1,4 @@
-const socket = io("https://050e-188-24-175-39.ngrok-free.app");
+const socket = io("http://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
@@ -28,7 +28,7 @@ addEventListener("submit", (e) => {
     uiHandler.showPlayerUi(playerLayout);
     ISREADY = true;
     const avatarIndex = parseInt(Math.random() * 42);
-    socket.emit("user-ready", { name: playerNameEl.value, avatarIndex });
+    socket.emit("userReady", { name: playerNameEl.value, avatarIndex });
 });
 //***************************************//
 //************** CONTROLS  *****************//
@@ -50,26 +50,26 @@ window.addEventListener('keydown', (e) => {
     if ((e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") && !keyControls.up) {
         keyControls.up = true;
         if (ISREADY)
-            socket.emit("player-movement", keyControls);
+            socket.emit("playerMovement", keyControls);
     }
     if ((e.key === keyboardMaps[playerLayout].left || e.key === "ArrowLeft") && !keyControls.left) {
         keyControls.left = true;
         if (ISREADY)
-            socket.emit("player-movement", keyControls);
+            socket.emit("playerMovement", keyControls);
     }
     if ((e.key === keyboardMaps[playerLayout].down || e.key === "ArrowDown") && !keyControls.down) {
         keyControls.down = true;
         if (ISREADY)
-            socket.emit("player-movement", keyControls);
+            socket.emit("playerMovement", keyControls);
     }
     if ((e.key === keyboardMaps[playerLayout].right || e.key === "ArrowRight") && !keyControls.right) {
         keyControls.right = true;
         if (ISREADY)
-            socket.emit("player-movement", keyControls);
+            socket.emit("playerMovement", keyControls);
     }
     if (e.key === " " && !keyControls.space) {
         if (ISREADY)
-            socket.emit("attack-melee-1");
+            socket.emit("attackMelee1");
         keyControls.space = true;
     }
     if (e.key === keyboardMaps[playerLayout].dash && !keyControls.dash) {
@@ -90,7 +90,7 @@ window.addEventListener('keyup', (e) => {
     if (e.key === keyboardMaps[playerLayout].dash)
         keyControls.dash = false;
     if (ISREADY)
-        socket.emit("player-movement", keyControls);
+        socket.emit("playerMovement", keyControls);
 });
 window.addEventListener('click', (e) => {
     if (ISREADY)
@@ -187,7 +187,7 @@ class Player {
         if (this.isAttacking && this.animations[this.cls + this.state].hasFrameEnded()) {
             els["melee"]["slot"].removeClass("onCd");
             if (ISREADY)
-                socket.emit("stop-attacking", this.state);
+                socket.emit("stopAttacking", this.state);
             this.isAttacking = false;
             if (keyControls.up || keyControls.down || keyControls.left || keyControls.right)
                 this.state = "run";
@@ -330,7 +330,7 @@ socket.on("map", (m) => {
     map = m.MAP;
     obstacles = m.OBSTACLES;
 });
-socket.on("players-data", ({ pl, bl, bffs }) => {
+socket.on("playersData", ({ pl, bl, bffs }) => {
     for (let p in pl) {
         if (!players.hasOwnProperty(pl[p].id)) {
             players[pl[p].id] = new Player(pl[p].id, {
@@ -358,16 +358,16 @@ socket.on("players-data", ({ pl, bl, bffs }) => {
     bullets = bl;
     buffs = bffs;
 });
-socket.on("damage-taken", data => {
+socket.on("damageTaken", data => {
     damageNumbers.push(new GameNumbers(socket.id, data.damage, data.isCrit, "damage"));
 });
-socket.on("damage-dealt", data => {
+socket.on("damageDealt", data => {
     damageNumbers.push(new GameNumbers(data.to, data.damage, data.isCrit, "damage"));
 });
-socket.on("player-buff-collision", data => {
+socket.on("playerBuffCollision", data => {
     uiHandler.addBuff(data.name, data.buff);
 });
-socket.on("player-buff-expire", data => {
+socket.on("playerBuffExpire", data => {
     console.log("expired", data);
     uiHandler.removeBuff(data.name, data.buffName);
 });

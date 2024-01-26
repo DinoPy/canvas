@@ -1,28 +1,41 @@
-import {createServer} from "http";
-import express from "express";
+import { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData, PlayerStats, BuffType, BuffKey, MapType, keyControlsType, BuffList, InnerBuffProps, PlayerType, innerPropTypes, BuffProps } from "./types.ts";
+import path from "path";
+import { createServer } from "http";
+import express, { Express, Request, Response } from "express";
 import cors from "cors";
-import {Server} from "socket.io";
+import { Server } from "socket.io";
 
-import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords } from "./utility.ts";
+import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords, merge } from "./utility.ts";
 
-const app = express();
+const app: Express = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+const io = new Server<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    InterServerEvents,
+    SocketData
+>(httpServer, {
     serveClient: true,
 });
-app.use(express.static("public"));
+
 app.use(cors());
+app.use(express.json());
 
-let players = {};
-let bullets = [];
-let buffs = [];
-const MAP = parseCsvMap("mapDesert_Ground");
-const OBSTACLES = parseCsvMap("mapDesert_Objects");
-const TICK_RATE = 60;
-const BULLET_SPEED = 25;
-const TILE_SIZE = 32;
+app.use("/game", express.static(path.join(__dirname, "../canvas_game/"), { index: "index.html" }));
 
-const BUFFS = {
+app.get("/", (req: Request, res: Response) => {
+    res.send("Home to TS converted server");
+});
+
+import fs from "fs";
+
+const MAP: MapType = parseCsvMap("mapDesert_Ground");
+const OBSTACLES: MapType = parseCsvMap("mapDesert_Objects");
+const TICK_RATE: number = 60;
+const BULLET_SPEED: number = 25;
+const TILE_SIZE: number = 32;
+
+const BUFFS: BuffType<BuffKey> = {
     minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 30, name: "Minor Swiftness", tier: 1 },
     mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 22, name: "Medium Swiftness", tier: 2 },
     majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 15, name: "Major Swiftness", tier: 3 },
@@ -40,7 +53,7 @@ const BUFFS = {
     majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 15, name: "Major Strengthening", tier: 3 },
     minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 30, name: "Minor Enchantment", tier: 1 },
     mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 22, name: "Medium Enchantment", tier: 2 },
-    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 15, name: "Major Enchantment", tier: 3 },
+    majorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 15, name: "Major Enchantment", tier: 3 },
     minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 30, name: "Minor Precision", tier: 1 },
     mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 22, name: "Medium Precision", tier: 2 },
     majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 15, name: "Major Precision", tier: 3 },
@@ -49,8 +62,8 @@ const BUFFS = {
     majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
 }
 
-const spawnRandomBuff = () => {
-    const buffsList = Object.keys(BUFFS);
+const spawnRandomBuff: () => { x: number, y: number, buff: BuffKey } = () => {
+    const buffsList: BuffKey[] = Object.keys(BUFFS) as BuffKey[];
     const randomBuff = buffsList[Math.floor(Math.random() * buffsList.length)];
     const coords = generateRespawnCoords(OBSTACLES);
 
@@ -62,7 +75,26 @@ const spawnRandomBuff = () => {
 };
 
 class Player {
-    constructor(id, x, y, name, avatarIndex) {
+    id: string;
+    name: string;
+    avatarIndex: number;
+    x: number; hbPaddingX: number;
+    y: number; hbPaddingY: number;
+    width: number; hbWidth: number;
+    height: number; hbHeight: number;
+    keyControls: keyControlsType;
+    score: number;
+    isAttacking: boolean;
+    state: "idle" | "attack" | "run";
+    direction: "down" | "up" | "left" | "right";
+    bulletCount: number;
+    dash: { isDashing: boolean, dashStart: null | number, cooldown: number, dashDuration: number };
+    attack1_alreadyHit: string[];
+    playerStats: PlayerStats;
+    playerBuffStats: PlayerStats;
+    buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+
+    constructor(id: string, x: number, y: number, name: string, avatarIndex: number) {
         this.id = id;
         this.name = name;
         this.avatarIndex = avatarIndex;
@@ -125,11 +157,13 @@ class Player {
         };
         this.playerBuffStats = {
             regen: {
+                lastRegen: 0,
                 amount: 0,
                 multiplier: 0,
                 interval: 0,
             },
             life: {
+                current: 0,
                 max: 0,
                 multiplier: 0,
             },
@@ -204,8 +238,8 @@ class Player {
                         this.attack1_alreadyHit.push(p);
                         const dmgDetails = Player.calculateDamage(players[this.id], players[p], "physical", 1);
                         players[p].playerStats.life.current -= dmgDetails.damage;
-                        io.to(p).emit("damage-taken", dmgDetails);
-                        io.to(this.id).emit("damage-dealt", { to: p, ...dmgDetails });
+                        io.to(p).emit("damageTaken", dmgDetails);
+                        io.to(this.id).emit("damageDealt", { to: p, ...dmgDetails });
                     }
 
                     if (players[p].playerStats.life.current <= 0) {
@@ -219,7 +253,7 @@ class Player {
     }
 
     updateDashStatus() {
-        if (this.dash.isDashing) {
+        if (this.dash.isDashing && this.dash.dashStart !== null) {
             if (+new Date - this.dash.dashStart > this.dash.dashDuration) {
                 this.dash.isDashing = false;
             }
@@ -239,12 +273,13 @@ class Player {
     }
 
     updateBuffs() {
-        const currentBuffs = Object.keys(this.buffs);
-        if (currentBuffs.length <= 0) return;
-        for (let i = 0; i < currentBuffs.length; i++) {
-            if (+new Date - this.buffs[currentBuffs[i]].since > this.buffs[currentBuffs[i]].duration * 1000) {
-                io.emit("player-buff-expire", { name: this.name, buffName: this.buffs[currentBuffs[i]].name })
-                Buff.remove(this, currentBuffs[i]);
+        const currentBuffs: BuffKey[] = Object.keys(this.buffs) as BuffKey[];
+        if (isNonEmptyBuffs(this.buffs)) {
+            for (let key of currentBuffs) {
+                if (+new Date - this.buffs[key].since > this.buffs[key].duration * 1000) {
+                    io.emit("playerBuffExpire", { name: this.name, buffName: this.buffs[key].name })
+                    Buff.remove(this, key);
+                }
             }
         }
     }
@@ -261,29 +296,35 @@ class Player {
                 { x: buffs[index].x, y: buffs[index].y, width: 32, height: 32 },
             )) {
                 Buff.applyToPlayer(players[this.id], buffs[index].type);
-                buffs.splice(index, 1)
+                buffs.splice(parseInt(index), 1)
             }
         }
     }
 
-    static calculateDamage(dealer, receiver, type, attackMultiplier) {
-        const offenderCurrentCrit = dealer.playerStats.crit.physicalRate + dealer.playerBuffStats.crit.physicalRate;
-        const isCrit = Math.random() < offenderCurrentCrit;
-        let damage = parseInt((dealer.playerStats.attack.physical * (dealer.playerStats.attack.physicalMultiplier + dealer.playerBuffStats.attack.physicalMultiplier) + dealer.playerBuffStats.attack.physical) * attackMultiplier);
+    static calculateDamage(dealer: Player, receiver: Player, type: "physical" | "magic", attackMultiplier: number) {
+        const offenderCurrentCrit: number = dealer.playerStats.crit.physicalRate + dealer.playerBuffStats.crit.physicalRate;
+        const isCrit: boolean = Math.random() < offenderCurrentCrit;
+        let damage: number = Math.trunc((dealer.playerStats.attack.physical * (dealer.playerStats.attack.physicalMultiplier + dealer.playerBuffStats.attack.physicalMultiplier) + dealer.playerBuffStats.attack.physical) * attackMultiplier);
         if (isCrit) {
             const offenderCurrentCritDamage = dealer.playerStats.crit.physicalDamage + dealer.playerBuffStats.crit.physicalDamage;
-            damage = parseInt(damage + (damage * offenderCurrentCritDamage));
+            damage = Math.trunc(damage + (damage * offenderCurrentCritDamage));
         }
 
         const receiverArmor = receiver.playerStats.armor[type] * (receiver.playerStats.armor[`${type}Multiplier`] +
             receiver.playerBuffStats.armor[`${type}Multiplier`]) + receiver.playerBuffStats.armor[type]
-        damage = parseInt(damage - receiverArmor);
+        damage = Math.trunc(damage - receiverArmor);
         return { damage, isCrit };
     }
 }
 
 class Bullet {
-    constructor(x, y, angle, ownerId) {
+    x: number; width: number;
+    y: number; height: number;
+    angle: number;
+    ownerId: string;
+    life: number;
+    score: number;
+    constructor(x: number, y: number, angle: number, ownerId: string) {
         this.x = x; this.width = 16;
         this.y = y; this.height = 11;
         this.angle = angle;
@@ -292,7 +333,7 @@ class Bullet {
         this.score = 0;
     }
 
-    move(delta) {
+    move(delta: number) {
         this.x += Math.cos(this.angle) * BULLET_SPEED;
         this.y += Math.sin(this.angle) * BULLET_SPEED;
         this.life -= delta;
@@ -316,8 +357,8 @@ class Bullet {
                     if (!players[p].dash.isDashing) {
                         const dmgDetails = Player.calculateDamage(players[this.ownerId], players[p], "physical", 0.6);
                         players[p].playerStats.life.current -= dmgDetails.damage;
-                        io.to(p).emit("damage-taken", dmgDetails);
-                        io.to(this.ownerId).emit("damage-dealt", { to: p, ...dmgDetails });
+                        io.to(p).emit("damageTaken", dmgDetails);
+                        io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
                     }
                     this.life = 0;
                 }
@@ -333,7 +374,13 @@ class Bullet {
 }
 
 class Buff {
-    constructor(x, y, type, duration, namee, tier) {
+    x: number; y: number;
+    type: BuffKey;
+    duration: number;
+    createdAt: Date;
+    name: string;
+    tier: number;
+    constructor(x: number, y: number, type: BuffKey, duration: number, namee: string, tier: number) {
         this.x = x;
         this.y = y;
         this.type = type;
@@ -343,39 +390,46 @@ class Buff {
         this.tier = tier;
     }
 
-    static applyProperties(action, p, buff) {
+    static applyProperties(action: "apply" | "remove", p: PlayerType, buff: BuffKey) {
         for (let prop in BUFFS[buff]) {
             if (!p.playerBuffStats.hasOwnProperty(prop)) continue;
-            for (let innerProp in BUFFS[buff][prop]) {
-                if (!p.playerBuffStats[prop].hasOwnProperty(innerProp)) continue;
+            const outerProp: keyof BuffList = prop as keyof BuffList;
+            for (let innerProp in BUFFS[buff][outerProp]) {
+                if (!p.playerBuffStats[outerProp].hasOwnProperty(innerProp)) continue;
                 action === "apply" ?
-                    p.playerBuffStats[prop][innerProp] = parseFloat((p.playerBuffStats[prop][innerProp] + BUFFS[buff][prop][innerProp]).toFixed(2)) :
-                    p.playerBuffStats[prop][innerProp] = parseFloat((p.playerBuffStats[prop][innerProp] - BUFFS[buff][prop][innerProp]).toFixed(2));
+                //@ts-ignore
+                    p.playerBuffStats[outerProp][innerProp] = parseFloat((p.playerBuffStats[outerProp][innerProp] + BUFFS[buff][outerProp][innerProp]).toFixed(2)) :
+                //@ts-ignore
+                    p.playerBuffStats[outerProp][innerProp] = parseFloat((p.playerBuffStats[outerProp][innerProp] - BUFFS[buff][prop][innerProp]).toFixed(2));
             }
         }
 
     }
 
-    static applyToPlayer(p, type) {
+
+    static applyToPlayer(p: Player, type: BuffKey) {
         if (!p.buffs.hasOwnProperty(type)) {
             this.applyProperties("apply", p, type);
-            io.emit("player-buff-collision", {
+            io.emit("playerBuffCollision", {
                 name: p.name,
                 buff: { name: BUFFS[type].name, tier: BUFFS[type].tier }
             })
         }
+        //@ts-ignore
         p.buffs[type] = { since: +new Date, duration: BUFFS[type].duration, name: BUFFS[type].name, tier: BUFFS[type].tier };
     }
 
-    static remove(p, type) {
-        this.applyProperties("remove", p, type);
-        delete p.buffs[type];
+    static remove(p: Player, type: BuffKey) {
+        if (isNonEmptyBuffs(p.buffs)) {
+            this.applyProperties("remove", p, type);
+            delete p.buffs[type];
+        }
     };
 
 
 }
 
-const resolveDupeName = (name, index) => {
+const resolveDupeName: (name: string, index: number) => string = (name, index) => {
     let currName = index === 1 ? name : name + index;
     console.log(currName);
     const sameNameCount = Object.keys(players).filter(id => players[id].name === currName);
@@ -388,9 +442,13 @@ const resolveDupeName = (name, index) => {
 
 }
 
+let players: { [key: string]: Player } = {};
+let bullets: Bullet[] = [];
+let buffs: Buff[] = [];
+
 async function main() {
     io.on("connection", (socket) => {
-        socket.on("user-ready", (data) => {
+        socket.on("userReady", (data) => {
             const coords = generateRespawnCoords(OBSTACLES);
             players[socket.id] = new Player(
                 socket.id,
@@ -403,7 +461,7 @@ async function main() {
 
         socket.emit("map", { MAP, OBSTACLES });
 
-        socket.on("player-movement", (controls) => {
+        socket.on("playerMovement", (controls) => {
             if (players[socket.id])
                 players[socket.id].keyControls = controls;
         });
@@ -426,12 +484,12 @@ async function main() {
             players[socket.id].dash.dashStart = +new Date;
         });
 
-        socket.on("attack-melee-1", () => {
+        socket.on("attackMelee1", () => {
             players[socket.id].isAttacking = true;
             players[socket.id].state = "attack";
         });
 
-        socket.on("stop-attacking", (state) => {
+        socket.on("stopAttacking", (state) => {
             players[socket.id].isAttacking = false;
             players[socket.id].state = state;
             players[socket.id].attack1_alreadyHit = [];
@@ -449,7 +507,7 @@ async function main() {
     });
 
 
-    async function tick(delta, players) {
+    async function tick(delta: number, players: { [key: string]: Player }) {
         for (let pl in players) {
             players[pl].checkState();
             players[pl].move();
@@ -464,21 +522,21 @@ async function main() {
             bullets[i].move(delta);
             bullets[i].checkHit();
         }
-        bullets = bullets.filter(b => {
+        bullets = bullets.filter((b: Bullet) => {
             let isAlive = b.life > 0;
             if (!isAlive && players[b.ownerId]?.bulletCount)
                 players[b.ownerId].bulletCount--;
             return isAlive;
         });
 
-        io.emit("players-data", { pl: players, bl: bullets, bffs: buffs });
+        io.emit("playersData", { pl: players, bl: bullets, bffs: buffs });
     };
 
     setInterval(() => {
         if (buffs.length >= 2) return;
         const newBuff = spawnRandomBuff();
         buffs.push(new Buff(newBuff.x, newBuff.y, newBuff.buff, BUFFS[newBuff.buff].duration, BUFFS[newBuff.buff].name, BUFFS[newBuff.buff].tier));
-    }, 20000);
+    }, 2000);
 
     let lastUpdate = Date.now();
     setInterval(() => {
@@ -491,11 +549,15 @@ async function main() {
 }
 
 
-const getDistance = (x1, y1, x2, y2) => {
+const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
     const xDistance = x2 - x1;
     const yDistance = y2 - y1;
 
     return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
+}
+
+function isNonEmptyBuffs(obj: any): obj is { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } {
+    return Object.keys(obj).length > 0;
 }
 
 main();
