@@ -27,8 +27,6 @@ app.get("/", (req: Request, res: Response) => {
     res.send("Home to TS converted server");
 });
 
-import fs from "fs";
-
 const MAP: MapType = parseCsvMap("mapDesert_Ground");
 const OBSTACLES: MapType = parseCsvMap("mapDesert_Objects");
 const TICK_RATE: number = 60;

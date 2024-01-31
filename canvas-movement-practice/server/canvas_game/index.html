@@ -9,7 +9,7 @@
 </head>
 
 <body oncontextmenu="return false">
-    <form class="overlay">
+    <form class="overlay" id="overlay">
         <input id="playerName" class="playerName" type="text" name="name" value="" placeholder="Player name"
             minlength="2" maxlength="12" required>
         <fieldset>
@@ -22,8 +22,8 @@
         <button type="submit" class="submitBtn"> Submit </button>
     </form>
 
-    <div class="players-overlay hidden"> </div>
-    <canvas> </canvas>
+    <div class="players-overlay hidden" id="playersOverlay"> </div>
+    <canvas id="canvas_game"> </canvas>
     <div class="abilities-overlay">
         <div class="abilities hidden" id="abilitiesEl">
         </div>
@@ -31,7 +31,6 @@
     <!-- <pre class="test-stats"> test </pre> -->
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="utility.js"> </script>
     <script type="module" src="index.js"> </script>
 </body>
 

@@ -96,7 +96,7 @@ export type BuffList = {
 }
 
 export type BuffType<K extends BuffKey> = {
-    [key in K]: { duration: number; name: string; tier: number } & BuffList;
+    [key in K]: { duration: number; name: string; tier: 1 | 2 | 3 } & BuffList;
 }
 
 export type MapType = ({ id: number } | undefined)[][];

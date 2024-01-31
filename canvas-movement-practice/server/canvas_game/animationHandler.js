@@ -1,17 +1,17 @@
 export class Animation {
-    /**
-    * @constructor
-    * @param {string} imgPath - animation image path, must have all the frames in one image
-    * @param {number} frames - the number of frames the animation has
-    * @param {number} stagger - the individual frame number
-    * @param {number} sw - source width
-    * @param {number} sh - source height
-    * @param {number} dw - destination width
-    * @param {number} dh - destination height
-    * @param {number} animOffset - animation offset - applicable when more than one animation exist on the same image
-    * @return {undefined} the return type is void
-    */
-    constructor(cx, imgPath, frames, stagger = 1, sw, sh, dw, dh, animOffset = 0) {
+    cx;
+    sw;
+    sh;
+    dw;
+    dh;
+    animOffset;
+    art;
+    individualFrame;
+    frames;
+    stagger;
+    isPlaying;
+    directions;
+    constructor(cx, imgPath, frames, stagger, sw, sh, dw, dh, animOffset = 0) {
         this.cx = cx;
         this.sw = sw;
         this.sh = sh;
@@ -22,7 +22,7 @@ export class Animation {
         this.art.src = imgPath;
         this.individualFrame = 0;
         this.frames = frames;
-        this.stagger = stagger;
+        this.stagger = stagger | 0;
         this.isPlaying = true;
         this.directions = {
             down: 0,
@@ -44,10 +44,6 @@ export class Animation {
         }
         return false;
     }
-    /**
-        * @param {number} dx - the x position the draw will start at;
-        * @param {number} y - the y position the draw will start at;
-    */
     //switch dir and gf params around so dir can be ignored and defaulted
     drawImage(dx, dy, gf, dir = "down", ox = 0, oy = 0) {
         this.animOffset = this.sh * this.directions[dir];
@@ -61,20 +57,20 @@ export class Animation {
         this.drawImage(-this.dw / 2, -this.dh / 2, gf, dir);
         this.cx.restore();
     }
-    playOnce(x, y) {
+    playOnce(x, y, gf) {
         if (this.individualFrame >= this.frames) {
             this.isPlaying = false;
             this.individualFrame = 0;
         }
         if (this.isPlaying) {
-            this.drawImage(x, y);
-            this.incrementFrame(ifr);
+            this.drawImage(x, y, gf);
+            this.incrementFrame(gf);
         }
     }
-    playRepeatedly(x, y) {
+    playRepeatedly(x, y, gf) {
         if (this.isPlaying) {
-            this.drawImage(x, y);
-            this.incrementFrame();
+            this.drawImage(x, y, gf);
+            this.incrementFrame(gf);
         }
     }
     static drawPlayerSize(cx, x, y) {
@@ -83,24 +79,14 @@ export class Animation {
     }
 }
 export class AnimationHandler {
+    animations;
     constructor() {
         this.animations = {};
     }
-    /**
-        @param {String} name - Name of the animation
-        @param {Animation} animObj - The particular animation object;
-        @return {undefined} the return type is void
-    */
     appendAnimation(name, animObj) {
         this.animations[name] = animObj;
     }
     returnAnimations() {
         return this.animations;
-    }
-    animateEnvironment() {
-    }
-    animatePlayer(cls, state, dir, dx, dy, ifr) {
-        console.log(cls + state, dir);
-        this.animations[cls + state].drawImage(dx, dy, ifr, dir);
     }
 }

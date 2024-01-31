@@ -1,11 +1,13 @@
-import {Socket} from "socket.io-client";
+import { isNonEmptyObj, getMapOffset } from "./utility.js";
+import { Directions } from "./animationHandler.js";
+import { Socket } from "socket.io-client";
 declare var io: any;
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
-const canvas: HTMLCanvasElement = document.querySelector('canvas');
-const cx = canvas.getContext('2d');
+const canvas: HTMLCanvasElement = document.getElementById('canvas_game') as HTMLCanvasElement;
+const cx: CanvasRenderingContext2D = canvas.getContext('2d') as CanvasRenderingContext2D;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -15,29 +17,32 @@ addEventListener("resize", () => {
     canvas.height = window.innerHeight;
 });
 
-import { GameUiHandler, keyboardMaps } from "./elementHandler.js";
+import { GameUiHandler, keyboardMaps, skillElementsType } from "./elementHandler.js";
 import { Animation } from "./animationHandler.js";
 
 const uiHandler = new GameUiHandler(cx);
 uiHandler.setUpSkill("melee", "./assets/attackIcon.png");
 uiHandler.setUpSkill("range", "./assets/rangeIcon.png");
 uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
-const els = uiHandler.returnSkillSlots();
+const els = uiHandler.returnSkillSlots() as skillElementsType;
 
-const overlayEl = document.querySelector(".overlay");
-const playerNameEl = document.getElementById("playerName");
-let playerLayout = "colemak-dh";
+const overlayEl: HTMLDivElement = document.getElementById("overlay") as HTMLDivElement;
+const playerNameEl: HTMLInputElement = document.getElementById("playerName") as HTMLInputElement;
+let playerLayout: "colemak-dh" | "querty" = "colemak-dh";
 
-let ISREADY = false;
+let ISREADY: boolean = false;
+let primaryPlayerId: string = "";
 
 addEventListener("submit", (e) => {
     e.preventDefault();
-    playerLayout = document.querySelector(`input[name="keyLayout"]:checked`).value
+    const inputEl: HTMLInputElement = document.querySelector(`input[name="keyLayout"]:checked`) as HTMLInputElement;
+    if (inputEl && (inputEl.value === "querty" || inputEl.value === "colemak-dh"))
+        playerLayout = inputEl.value;
     overlayEl.style.display = "none";
     uiHandler.showPlayerUi(playerLayout);
     ISREADY = true;
-    const avatarIndex = parseInt(Math.random() * 42);
-    socket.emit("userReady", {name: playerNameEl.value, avatarIndex});
+    const avatarIndex: number = Math.trunc(Math.random() * 42);
+    socket.emit("userReady", { name: playerNameEl.value, avatarIndex });
 });
 
 //***************************************//
@@ -53,8 +58,8 @@ let keyControls = {
 }
 let mouseControls = {
     down: false,
-    x: undefined,
-    y: undefined,
+    x: 0,
+    y: 0,
 }
 window.addEventListener('keydown', (e) => {
     if ((e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") && !keyControls.up) {
@@ -98,7 +103,11 @@ window.addEventListener('click', (e) => {
 });
 
 document.body.addEventListener("blur", () => {
-    Object.keys(keyControls).map(k => keyControls[k] = false);
+    Object.keys(keyControls).map(k => {
+        type Keys = "up" | "down" | "left" | "right" | "space" | "dash";
+        let key: Keys = k as Keys;
+        keyControls[key] = false;
+    })
 });
 
 //***************************************//
@@ -106,42 +115,53 @@ document.body.addEventListener("blur", () => {
 //***************************************//
 
 /////////// IMAGES //////////////
-let images = {};
+let images: ImagesObj = {
+    dash: new Image(),
+    frame3: new Image(),
+    frame2: new Image(),
+    frame1: new Image(),
+    fortification: new Image(),
+    enchantment: new Image(),
+    devastation: new Image(),
+    precision: new Image(),
+    rejuvenation: new Image(),
+    strengthening: new Image(),
+    swiftness: new Image(),
+    warding: new Image(),
+};
 const mapImg = new Image();
-mapImg.src = "./assets/Desert Tileset1.png";
 const obstaclesImg = new Image();
+mapImg.src = "./assets/Desert Tileset1.png";
 obstaclesImg.src = "./assets/Desert Tileset.png";
-images["dash"] = new Image();
 images.dash.src = "./assets/dash2.png";
-images["frame3"] = new Image(); images["frame2"] = new Image(); images["frame1"] = new Image();
 images.frame3.src = "./assets/frames/gold.png"; images.frame2.src = "./assets/frames/blue.png"; images.frame1.src = "./assets/frames/green.png";
-images.fortification = new Image(); images.enchantment = new Image(); images.devastation = new Image();
-images.precision = new Image(); images.rejuvenation = new Image(); images.strengthening = new Image();
-images.swiftness = new Image(); images.warding = new Image();
 images.fortification.src = "./assets/icons/fortification.png"; images.enchantment.src = "./assets/icons/enchantment.png"; images.devastation.src = "./assets/icons/devastation.png"; images.precision.src = "./assets/icons/precision.png"; images.rejuvenation.src = "./assets/icons/rejuvenation.png"; images.strengthening.src = "./assets/icons/strengthening.png", images.swiftness.src = "./assets/icons/swiftness.png"; images.warding.src = "./assets/icons/warding.png";
 
 
-const darkPoisonAnim = new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64);
-const iceSpellAnim = new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32);
-const arrowAnim = new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25);
-const water1Anim = new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50);
-const flame1Anim = new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600);
-const flame2Anim = new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220);
+const darkPoisonAnim: AnimationType = new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64);
+const iceSpellAnim: AnimationType = new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32);
+const arrowAnim: AnimationType = new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25);
+const water1Anim: AnimationType = new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50);
+const flame1Anim: AnimationType = new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600);
+const flame2Anim: AnimationType = new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220);
 
-class Player {
-    animationStates = {
-        "run-down": { name: "down", frames: 15, },
-        "run-up": { name: "up", frames: 15, },
-        "run-left": { name: "left", frames: 15, },
-        "run-right": { name: "right", frames: 15, },
-        "idle": { name: "idle", frames: 30 },
-        "attack-down": { name: "down", frames: 15, },
-        "attack-up": { name: "up", frames: 15, },
-        "attack-left": { name: "left", frames: 15, },
-        "attack-right": { name: "right", frames: 15, },
-        "fire-burning": { name: "fire-burning", frame: 53 },
-    }
-    constructor(id, animations, avatarIndex, namee) {
+class Player implements PlayerType {
+    id: string;
+    cls: "warrior"
+    x: number; y: number;
+    width: number; height: number;
+    life: number;
+    direction: "down" | "up" | "left" | "right";
+    state: "idle" | "attack" | "run";
+    isAttacking: boolean;
+    name: string;
+    dash: { isDashing: boolean, dashStart: number; cooldown: number; dashDuration: number; };
+    avatarIndex: number;
+    bulletCount: number;
+    buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+    animations: { [key: string]: AnimationType };
+
+    constructor(id: string, animations: { [key: string]: AnimationType }, avatarIndex: number, namee: string) {
         this.id = id;
         this.cls = "warrior";
         this.x = 0;
@@ -149,26 +169,18 @@ class Player {
         this.width = 96;
         this.height = 96;
         this.life = 100;
-        this.score = 0;
         this.direction = "down";
         this.state = "idle";
         this.isAttacking = false;
-        this.individualFrame = 0;
         this.name = namee || "Player";
-        this.dash = {
-            isDashing: false,
-            dashStart: null,
-            cooldown: 3000,
-            dashDuration: 300,
-        };
+        this.dash = { isDashing: false, dashStart: 0, cooldown: 3000, dashDuration: 300, };
         this.avatarIndex = avatarIndex || 1;
         this.bulletCount = 0;
         this.animations = animations;
         this.buffs = {};
-        this.playerBuffStats = {};
     }
 
-    draw(camX, camY, gf) {
+    draw(camX: number, camY: number, gf: number) {
         if (this.dash.isDashing) {
             cx.globalAlpha = 0.4;
             cx.drawImage(images.dash,
@@ -191,7 +203,7 @@ class Player {
         // Animation.drawPlayerSize(cx, this.x - (camX || 0), this.y - (camY || 0));
     }
 
-    showStats(id, camX, camY) {
+    showStats(id: string, camX: number, camY: number) {
         cx.globalAlpha = 0.6;
         cx.fillStyle = "rgba(0,0,0,0.8)"
         cx.fillRect(this.x - (camX || 0) - 2,
@@ -205,7 +217,7 @@ class Player {
         cx.globalAlpha = 1;
     }
 
-    showName(camX, camY) {
+    showName(camX: number, camY: number) {
         cx.fillStyle = "black";
         cx.font = "300 22px Rubik Doodle Shadow";
         cx.textAlign = "center";
@@ -217,7 +229,7 @@ class Player {
         )
     }
 
-    meleeAttack1(camX, camY) {
+    meleeAttack1() {
         if (keyControls.space && !this.isAttacking) {
             els["melee"]["slot"].addClass("onCd");
         }
@@ -225,10 +237,10 @@ class Player {
         //cx.fillRect(this.x - (camX || 0) + 10, this.y - (camY || 0) + 65, 75, 30);
     }
 
-    shot(camX, camY, offsets, id) {
+    shot(offsets: CoordsOffsetsType) {
         // any positive alteration of the bullet source needs to be decreased from the mouse coordonates.
         // the reason may be: that the bullet position is only altered visually and so.
-        if (this.id === socket.id) {
+        if (this.id === primaryPlayerId) {
             const angle = Math.atan2(
                 mouseControls.y - offsets.offsetY - this.width / 2,
                 mouseControls.x - offsets.offsetX - this.height / 2
@@ -244,7 +256,7 @@ class Player {
     }
 
     checkDashing() {
-        if (this.id === socket.id && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
+        if (this.id === primaryPlayerId && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
             keyControls.dash = false;
             this.dash.dashStart = +new Date;
@@ -253,8 +265,8 @@ class Player {
 
     }
 
-    updateUi(gameFrame) {
-        if (socket.id === this.id && gameFrame % 6 === 0) {
+    updateUi(gameFrame: number) {
+        if (primaryPlayerId === this.id && gameFrame % 6 === 0) {
             if (!this.dash.isDashing &&
                 this.dash.dashStart + this.dash.cooldown < +new Date) {
                 uiHandler.removeCd("dash", els)
@@ -275,30 +287,40 @@ class Player {
             const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life, avatarIndex: players[p].avatarIndex }))
             uiHandler.updatePlayers(pls);
 
-            for (let buff in this.buffs) {
-                uiHandler.updateBuffDuration(this.name, this.buffs[buff]);
+            if (isNonEmptyObj<PlayerBuffData>(this.buffs)) {
+                for (let buff in this.buffs) {
+                    const currentBuff: BuffKey = buff as BuffKey;
+                    uiHandler.updateBuffDuration(this.name, this.buffs[currentBuff]);
+                }
             }
         }
     }
 
-    update(camX, camY, offsets, id, gameFrame) {
+    update(camX: number, camY: number, offsets: CoordsOffsetsType, id: string, gameFrame: number) {
         //************ MOUSE CONTROLS ****************/
         if (mouseControls.down)
-            this.shot(camX, camY, offsets);
+            this.shot(offsets);
         this.draw(camX, camY, gameFrame);
         this.showStats(id, camX, camY);
         this.showName(camX, camY);
-        this.meleeAttack1(camX, camY);
+        this.meleeAttack1();
         this.checkDashing();
         this.updateUi(gameFrame);
-
-        this.individualFrame++;
     }
 }
 
-let damageNumbers = [];
+let damageNumbers: DamageNumbersType[] = [];
 class GameNumbers {
-    constructor(user, amount, isCrit, type) {
+    user: string;
+    amount: number;
+    isCrit: boolean;
+    type: "damage";
+    at: number;
+    duration: number;
+    xOffset: number; yOffset: number;
+    bulletCount: number;
+
+    constructor(user: string, amount: number, isCrit: boolean, type: "damage") {
         this.user = user;
         this.amount = amount;
         this.isCrit = isCrit;
@@ -310,12 +332,12 @@ class GameNumbers {
         this.bulletCount = 0;
     }
 
-    draw(camX, camY) {
+    draw(camX: number, camY: number) {
         if (!players[this.user]) return;
         cx.fillStyle = this.isCrit ? "red" : "white";
         cx.font = `300 ${this.isCrit ? "30" : "20"}px Rubik Doodle Shadow`
         cx.fillText(
-            this.amount,
+            String(this.amount),
             players[this.user].x - (camX || 0) + players[this.user].width / 2 + this.xOffset,
             players[this.user].y - (camY || 0) - 10 - this.yOffset,
         );
@@ -328,24 +350,26 @@ class GameNumbers {
             damageNumbers.pop();
     }
 
-    update(camX, camY) {
+    update(camX: number, camY: number) {
         this.checkDuration();
         this.draw(camX, camY);
     };
 }
 
 const TILE_SIZE = 32;
-let players = {};
-let bullets = [];
-let buffs = [];
-let map = [[]];
-let obstacles = [[]];
+type PlayersObject = { [key: string]: PlayerType };
+let players: PlayersObject = {};
+let bullets: BulletType[] = [];
+let buffs: BuffObjectType[] = [];
+let map: MapType = [[]];
+let obstacles: MapType = [[]];
 
 //*********************************************//
 //************** MULTIPLAYER *****************//
 //*******************************************//
 
 socket.on("connect", () => {
+    primaryPlayerId = socket.id as string;
     ISREADY = false;
     overlayEl.style.display = "flex";
 });
@@ -368,7 +392,6 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;
         players[pl[p].id].life = pl[p].playerStats.life.current;
-        players[pl[p].id].score = pl[p].score;
         players[pl[p].id].isAttacking = pl[p].isAttacking;
         players[pl[p].id].state = pl[p].state;
         players[pl[p].id].direction = pl[p].direction;
@@ -389,7 +412,8 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
 });
 
 socket.on("damageTaken", data => {
-    damageNumbers.push(new GameNumbers(socket.id, data.damage, data.isCrit, "damage"))
+    if (socket.id !== undefined)
+        damageNumbers.push(new GameNumbers(socket.id, data.damage, data.isCrit, "damage"))
 });
 
 socket.on("damageDealt", data => {
@@ -427,17 +451,18 @@ const animate = () => {
     cx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     let cameraX = 0, cameraY = 0, offsets;
-    const myPlayer = players[socket.id];
+    const myPlayer = players[primaryPlayerId];
     if (myPlayer) {
         offsets = getMapOffset(myPlayer, canvas.width, canvas.height, TILE_SIZE, map.length);
-        cameraX = parseInt(myPlayer.x - offsets.offsetX);
-        cameraY = parseInt(myPlayer.y - offsets.offsetY);
+        cameraX = Math.trunc(myPlayer.x - offsets.offsetX);
+        cameraY = Math.trunc(myPlayer.y - offsets.offsetY);
     }
 
     for (let row = 0; row < map.length; row++) {
         for (let col = 0, rl = map[0].length; col < rl; col++) {
-            const { id } = map[row][col];
-            const imgRow = parseInt(id / TILES_IN_ROW);
+            const id = map[row][col]?.id;
+            if (typeof id !== "number") continue;
+            const imgRow = Math.trunc(id / TILES_IN_ROW);
             const imgCol = id % TILES_IN_ROW;
 
             // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
@@ -452,17 +477,15 @@ const animate = () => {
                 TILE_SIZE,
                 TILE_SIZE
             );
-
         }
     }
 
 
     for (let row = 0; row < obstacles.length; row++) {
         for (let col = 0, rl = obstacles[0].length; col < rl; col++) {
-            if (!obstacles[row][col])
-                continue;
-            const { id } = obstacles[row][col];
-            const imgRow = parseInt(id / 35);
+            const id = obstacles[row][col]?.id;
+            if (typeof id !== "number") continue;
+            const imgRow = Math.trunc(id / 35);
             const imgCol = id % 35;
             cx.drawImage(
                 obstaclesImg,
@@ -483,9 +506,10 @@ const animate = () => {
     }
 
     for (let p in players) {
-        players[p].update(cameraX, cameraY, offsets, players[p].id, gameFrame);
+        let validatedOffset = offsets as { offsetX: number; offsetY: number };
+        players[p].update(cameraX, cameraY, validatedOffset, players[p].id, gameFrame);
         /*
-        if (p === socket.id) {
+        if (p === primaryPlayerId) {
             statsEl.innerText = JSON.stringify(players[p].buffs, null, 2);
             statsEl.innerText += JSON.stringify(players[p].playerBuffStats, null, 2);
             statsEl.style = "position: absolute";
@@ -494,9 +518,10 @@ const animate = () => {
     }
 
     for (let buff of buffs) {
-        cx.fillText(buff.name, buff.x - cameraX , buff.y - cameraY);
-        cx.drawImage(images[`frame${buff.tier}`], buff.x - cameraX, buff.y - cameraY);
-        const name = buff.name.split(" ")[1].toLowerCase();
+        cx.fillText(buff.name, buff.x - cameraX, buff.y - cameraY);
+        const buffFrame = `frame${buff.tier}` as "frame1" | "frame2" | "frame3";
+        cx.drawImage(images[buffFrame], buff.x - cameraX, buff.y - cameraY);
+        const name = buff.name.split(" ")[1].toLowerCase() as ImportedImagesType;
         cx.drawImage(images[name], buff.x - cameraX, buff.y - cameraY);
 
     }
@@ -505,13 +530,16 @@ const animate = () => {
         damageNumbers[i].update(cameraX, cameraY);
     }
 
-    gameFrame++;
-    darkPoisonAnim.drawImage(500 - cameraX, 500 - cameraY, gameFrame)
 
+    /*
+    flame2Anim.drawImage(500 - cameraX, 300 - cameraY, gameFrame);
     iceSpellAnim.drawRotated(400 - cameraX, 400 - cameraY, gameFrame, angle);
+    darkPoisonAnim.drawImage(500 - cameraX, 500 - cameraY, gameFrame)
     water1Anim.drawRotated(300 - cameraX, 300 - cameraY, gameFrame, angle);
     flame1Anim.drawRotated(400 - cameraX, 300 - cameraY, gameFrame, angle);
-    flame2Anim.drawImage(500 - cameraX, 300 - cameraY, gameFrame, angle);
+    */
+
+    gameFrame++;
     requestAnimationFrame(animate);
 }
 
@@ -542,12 +570,15 @@ animate();
 
 
 
+
+
+
 export interface ServerToClientEvents {
     map: (data: { MAP: MapType, OBSTACLES: MapType }) => void;
-    playersData: (data: { pl: { [key: string]: PlayerType }, bl: BulletType[], bffs: BuffObjectType[] }) => void;
+    playersData: (data: { pl: { [key: string]: PlayerTypeServer }, bl: BulletType[], bffs: BuffObjectType[] }) => void;
     damageTaken: (dmgDetails: { damage: number; isCrit: boolean }) => void;
     damageDealt: (dmgDetails: { to: string; damage: number; isCrit: boolean }) => void;
-    playerBuffCollision: (data: { name: string; buff: { name: string, tier: number } }) => void;
+    playerBuffCollision: (data: { name: string; buff: { name: string, tier: 1 | 2 | 3 } }) => void;
     playerBuffExpire: (data: { name: string, buffName: string }) => void;
 }
 
@@ -567,7 +598,48 @@ export interface InterServerEvents {
 export interface SocketData {
 }
 
+export interface DamageNumbersType {
+    user: string;
+    amount: number;
+    isCrit: boolean;
+    type: "damage";
+    at: number;
+    duration: number;
+    xOffset: number; yOffset: number;
+    bulletCount: number;
+
+
+    draw: (camX: number, camY: number) => void;
+    checkDuration: () => void;
+    update: (camX: number, camY: number) => void
+}
+
 export interface PlayerType {
+    id: string;
+    cls: "warrior"
+    x: number; y: number;
+    width: number; height: number;
+    life: number;
+    direction: "down" | "up" | "left" | "right";
+    state: "idle" | "attack" | "run";
+    isAttacking: boolean;
+    name: string;
+    dash: { isDashing: boolean, dashStart: number | null; cooldown: number; dashDuration: number; };
+    avatarIndex: number;
+    bulletCount: number;
+    buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+
+    draw: (camX: number, camY: number, gf: number) => void;
+    showStats: (id: string, camX: number, camY: number) => void;
+    showName: (camX: number, camY: number) => void;
+    meleeAttack1: () => void;
+    shot: (offsets: CoordsOffsetsType) => void;
+    checkDashing: () => void;
+    updateUi: (gameFrame: number) => void;
+    update: (camX: number, camY: number, offsets: CoordsOffsetsType, id: string, gameFrame: number) => void;
+}
+
+export interface PlayerTypeServer {
     id: string;
     name: string;
     avatarIndex: number;
@@ -585,7 +657,7 @@ export interface PlayerType {
     attack1_alreadyHit: string[];
     playerStats: PlayerStats;
     playerBuffStats: PlayerStats;
-    buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+    buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: 1 | 2 | 3 } } | {};
 }
 
 export interface BulletType {
@@ -603,7 +675,7 @@ export interface BuffObjectType {
     duration: number;
     createdAt: Date;
     name: string;
-    tier: number;
+    tier: 1 | 2 | 3;
 }
 
 export interface PlayerStats {
@@ -625,10 +697,10 @@ export type BuffKey = "minorSwiftness" | "mediumSwiftness" | "majorSwiftness" | 
 
 export type innerPropTypes = "lastRegen" | "amount" | "multiplier" | "interval" | "max" | "current" | "physicalRate" | "physicalDamage" | "magicRate" | "magicDamage" | "physical" | "physicalMultiplier" | "magic" | "magicMultiplier" | "speed";
 
-export type MovementBuff = {speed: number; multiplier: number };
-export type RegenBuff = {amount: number; multiplier: number };
-export type AttackArmorBuff = {physical?: number; physicalMultiplier?: number; magic?: number; magicMultiplier?: number };
-export type CritBuff = {physicalRate?: number; magicRate?: number; physicalDamage?: number; magicDamage?: number};
+export type MovementBuff = { speed: number; multiplier: number };
+export type RegenBuff = { amount: number; multiplier: number };
+export type AttackArmorBuff = { physical?: number; physicalMultiplier?: number; magic?: number; magicMultiplier?: number };
+export type CritBuff = { physicalRate?: number; magicRate?: number; physicalDamage?: number; magicDamage?: number };
 
 export type BuffList = {
     movement?: MovementBuff;
@@ -637,9 +709,9 @@ export type BuffList = {
     attack?: AttackArmorBuff;
     crit?: CritBuff;
 }
-
+export type PlayerBuffData = { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } };
 export type BuffType<K extends BuffKey> = {
-    [key in K]: { duration: number; name: string; tier: number } & BuffList;
+    [key in K]: { duration: number; name: string; tier: 1 | 2 | 3 } & BuffList;
 }
 
 export type MapType = ({ id: number } | undefined)[][];
@@ -649,3 +721,35 @@ export type keyControlsType = { up: boolean, down: boolean, left: boolean, right
 export type emitBulletArgType = { angle: number; x: number; y: number };
 
 export interface SquareColisionParams { x: number; y: number; width: number; height: number }
+
+export type CoordsOffsetsType = { offsetX: number; offsetY: number };
+export interface AnimationType {
+    cx: CanvasRenderingContext2D;
+    sw: number; sh: number; dw: number; dh: number;
+    animOffset: number;
+    art: HTMLImageElement;
+    individualFrame: number;
+    frames: number;
+    stagger: number;
+    isPlaying: boolean;
+    directions: { down: number; up: number; left: number; right: number };
+
+
+    incrementFrame: (gf: number) => void;
+    hasFrameEnded: () => boolean;
+    drawImage: (dx: number, dy: number, gf: number, dir?: Directions, ox?: number, oy?: number) => void;
+    drawRotated: (dx: number, dy: number, gf: number, angle: number, dir?: Directions) => void;
+    playOnce: (x: number, y: number, gf: number) => void;
+    playRepeatedly: (x: number, y: number, gf: number) => void;
+    //drawPlayerSize: (cx: CanvasRenderingContext2D, x: number, y: number) => void;
+
+}
+
+export type ImportedImagesType = "dash" | "frame3" | "frame2" | "frame1" | "fortification" | "enchantment" | "devastation" | "precision" | "rejuvenation" | "strengthening" | "swiftness" | "warding";
+
+
+export type ImagesObj = {
+    [key in ImportedImagesType] : HTMLImageElement;
+}
+
+

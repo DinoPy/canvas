@@ -1,10 +1,14 @@
-const abilitiesEl = document.querySelector("#abilitiesEl");
-const playersEl = document.querySelector(".players-overlay");
+import { isNonEmptyObj } from "./utility.js";
+const abilitiesEl = document.getElementById("abilitiesEl");
+const playersEl = document.getElementById("playersOverlay");
 export const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
+    "querty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
     "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
 };
 export class ElHandler {
+    type;
+    class;
+    el;
     constructor(type, elClass = "", textContent = "", src = "") {
         this.type = type;
         this.class = elClass;
@@ -12,7 +16,7 @@ export class ElHandler {
         if (elClass.length > 1)
             this.el.classList.add(this.class);
         this.el.textContent = textContent;
-        if (this.type === "img")
+        if (this.type === "img" && this.el instanceof HTMLImageElement)
             this.el.src = src;
     }
     appendSelf(el) { el.append(this.el); }
@@ -20,17 +24,19 @@ export class ElHandler {
     removeSelf() { this.el.remove(); }
     ;
     returnSelf() { return this.el; }
-    updateTextContents(content) { this.el.textContent = content; }
+    updateTextContents(content) { this.el.textContent = String(content); }
     addClass(cls) { this.el.classList.add(cls); }
     removeClass(cls) { this.el.classList.remove(cls); }
     toggleClass(cls) { this.el.classList.toggle(cls); }
 }
 export class GameUiHandler {
-    constructor(cx, images) {
+    cx;
+    skillSlotsEls;
+    playerEls;
+    constructor(cx) {
         this.skillSlotsEls = {};
         this.playerEls = {};
         this.cx = cx;
-        this.images = images;
     }
     showPlayerUi(layout) {
         this.setUpSkillSlotKeys(layout);
@@ -38,6 +44,8 @@ export class GameUiHandler {
         playersEl.classList.remove("hidden");
     }
     setUpSkillSlotKeys(layout) {
+        if (!isNonEmptyObj(this.skillSlotsEls))
+            return;
         this.skillSlotsEls["dash"]["key"].updateTextContents(keyboardMaps[layout].dash.toUpperCase());
         this.skillSlotsEls["melee"]["key"].updateTextContents(keyboardMaps[layout].melee.toUpperCase());
         this.skillSlotsEls["range"]["key"].updateTextContents(keyboardMaps[layout].range.toUpperCase());
@@ -145,7 +153,7 @@ export class GameUiHandler {
     updateBuffDuration(pName, buff) {
         if (!this.playerEls[pName].durationEls[buff.name]?.duration)
             return;
-        const timeLeft = buff.duration - parseInt((+new Date - buff.since) / 1000);
+        const timeLeft = buff.duration - Math.trunc((+new Date - buff.since) / 1000);
         this.playerEls[pName].durationEls[buff.name].duration.updateTextContents(timeLeft);
     }
 }
