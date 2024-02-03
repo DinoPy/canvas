@@ -60,7 +60,8 @@ const BUFFS: BuffType<BuffKey> = {
     majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
 }
 
-const spawnRandomBuff: () => { x: number, y: number, buff: BuffKey } = () => {
+type spawnRandomBuffType = () => { x: number, y: number, buff: BuffKey };
+const spawnRandomBuff: spawnRandomBuffType = () => {
     const buffsList: BuffKey[] = Object.keys(BUFFS) as BuffKey[];
     const randomBuff = buffsList[Math.floor(Math.random() * buffsList.length)];
     const coords = generateRespawnCoords(OBSTACLES);
@@ -322,6 +323,7 @@ class Bullet {
     ownerId: string;
     life: number;
     score: number;
+    velocity: number;
     constructor(x: number, y: number, angle: number, ownerId: string) {
         this.x = x; this.width = 16;
         this.y = y; this.height = 11;
@@ -329,11 +331,12 @@ class Bullet {
         this.ownerId = ownerId;
         this.life = 1000;
         this.score = 0;
+        this.velocity = 30;
     }
 
     move(delta: number) {
-        this.x += Math.cos(this.angle) * BULLET_SPEED;
-        this.y += Math.sin(this.angle) * BULLET_SPEED;
+        this.x += Math.cos(this.angle) * this.velocity;
+        this.y += Math.sin(this.angle) * this.velocity;
         this.life -= delta;
 
         if (isColidingWithEnvironment(OBSTACLES, { x: this.x, y: this.y, width: 16, height: 11 }))
@@ -427,7 +430,8 @@ class Buff {
 
 }
 
-const resolveDupeName: (name: string, index: number) => string = (name, index) => {
+type resolveDupeNameType = (name: string, index: number) => string;
+const resolveDupeName: resolveDupeNameType = (name, index) => {
     let currName = index === 1 ? name : name + index;
     console.log(currName);
     const sameNameCount = Object.keys(players).filter(id => players[id].name === currName);
@@ -440,12 +444,14 @@ const resolveDupeName: (name: string, index: number) => string = (name, index) =
 
 }
 
-let players: { [key: string]: Player } = {};
+type PlayerListType = { [key: string]: Player };
+let players: PlayerListType = {};
 let bullets: Bullet[] = [];
 let buffs: Buff[] = [];
 
 async function main() {
     io.on("connection", (socket) => {
+        socket.join("default");
         socket.on("userReady", (data) => {
             const coords = generateRespawnCoords(OBSTACLES);
             players[socket.id] = new Player(
@@ -546,13 +552,6 @@ async function main() {
     }, 1000 / TICK_RATE);
 }
 
-
-const getDistance = (x1: number, y1: number, x2: number, y2: number) => {
-    const xDistance = x2 - x1;
-    const yDistance = y2 - y1;
-
-    return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
-}
 
 function isNonEmptyBuffs(obj: any): obj is { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } {
     return Object.keys(obj).length > 0;

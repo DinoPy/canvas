@@ -386,7 +386,7 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
             players[pl[p].id] = new Player(pl[p].id, {
                 "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
                 "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
-                "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 2, 100, 100, 96, 96),
+                "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 3, 100, 100, 96, 96),
             }, pl[p].avatarIndex, pl[p].name);
         }
         players[pl[p].id].x = pl[p].x;
