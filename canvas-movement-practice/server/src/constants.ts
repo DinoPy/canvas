@@ -1,0 +1,34 @@
+import { parseCsvMap } from "./utility";
+import { MapType, BuffType, BuffKey } from "./types";
+
+export const MAP: MapType = parseCsvMap("mapDesert_Ground");
+export const OBSTACLES: MapType = parseCsvMap("mapDesert_Objects");
+export const TICK_RATE: number = 60;
+export const TILE_SIZE: number = 32;
+
+export const BUFFS: BuffType<BuffKey> = {
+    minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 30, name: "Minor Swiftness", tier: 1 },
+    mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 22, name: "Medium Swiftness", tier: 2 },
+    majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 15, name: "Major Swiftness", tier: 3 },
+    rejuvenationMinor: { regen: { amount: 0, multiplier: 0.25 }, duration: 30, name: "Minor Rejuvenation", tier: 1 },
+    rejuvenationMedium: { regen: { amount: 0, multiplier: 0.50 }, duration: 22, name: "Medium Rejuvenation", tier: 2 },
+    rejuvenationMajor: { regen: { amount: 0, multiplier: 1 }, duration: 15, name: "Major Rejuvenation", tier: 3 },
+    minorFortification: { armor: { physical: 0, physicalMultiplier: 0.25 }, duration: 30, name: "Minor Fortification", tier: 1 },
+    mediumFortification: { armor: { physical: 0, physicalMultiplier: 0.50 }, duration: 22, name: "Medium Fortification", tier: 2 },
+    majorFortification: { armor: { physical: 0, physicalMultiplier: 1 }, duration: 15, name: "Major Fortification", tier: 3 },
+    minorWarding: { armor: { magic: 0, magicMultiplier: 0.25 }, duration: 30, name: "Minor Warding", tier: 1 },
+    mediumWarding: { armor: { magic: 0, magicMultiplier: 0.50 }, duration: 22, name: "Medium Warding", tier: 2 },
+    majorWarding: { armor: { magic: 0, magicMultiplier: 1 }, duration: 15, name: "Major Warding", tier: 3 },
+    minorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.2 }, duration: 30, name: "Minor Strengthening", tier: 1 },
+    mediumStrengthening: { attack: { physical: 0, physicalMultiplier: 0.4 }, duration: 22, name: "Medium Strengthening", tier: 2 },
+    majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 15, name: "Major Strengthening", tier: 3 },
+    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 30, name: "Minor Enchantment", tier: 1 },
+    mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 22, name: "Medium Enchantment", tier: 2 },
+    majorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 15, name: "Major Enchantment", tier: 3 },
+    minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 30, name: "Minor Precision", tier: 1 },
+    mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 22, name: "Medium Precision", tier: 2 },
+    majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 15, name: "Major Precision", tier: 3 },
+    minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 30, name: "Minor Devastation", tier: 1 },
+    mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 22, name: "Medium Devastation", tier: 2 },
+    majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
+}
