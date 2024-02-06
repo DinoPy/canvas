@@ -8,6 +8,7 @@ const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://lo
 //***************************************//
 const canvas: HTMLCanvasElement = document.getElementById('canvas_game') as HTMLCanvasElement;
 const cx: CanvasRenderingContext2D = canvas.getContext('2d') as CanvasRenderingContext2D;
+const gameRoomsContainer = document.getElementById("gameRooms") as HTMLDivElement;
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -28,43 +29,21 @@ const els = uiHandler.returnSkillSlots() as skillElementsType;
 
 const overlayEl: HTMLDivElement = document.getElementById("overlay") as HTMLDivElement;
 const playerNameEl: HTMLInputElement = document.getElementById("playerName") as HTMLInputElement;
-const keyboardLayerSelectorEl = document.getElementById("keyboardLayersContainer") as HTMLFieldSetElement;
-const newRoomToggleEl = document.getElementById("newGameRoom") as HTMLButtonElement;
-const gameRoomSelectorEl = document.getElementById("gameRooms") as HTMLDivElement;
-const newRoomOverlayEl = document.getElementById("newRoomOverlay") as HTMLFormElement;
-const newRoomAddEl = document.getElementById("addNewRoom") as HTMLButtonElement;
-const roomPasswordEl = overlayEl.querySelector("#selectedRoomPassword") as HTMLInputElement;
-
 let playerLayout: "colemak-dh" | "qwerty" = "colemak-dh";
+
 let ISREADY: boolean = false;
 let primaryPlayerId: string = "";
 
-newRoomToggleEl.addEventListener("click", (e) => {
+addEventListener("submit", (e) => {
     e.preventDefault();
-    roomPasswordEl.setCustomValidity("");
-    roomPasswordEl.reportValidity();
-    newRoomOverlayEl.classList.toggle("hidden");
-});
-
-newRoomAddEl.addEventListener("click", (e) => {
-    const newRoomNameInputEl = document.getElementById("newRoomName") as HTMLInputElement;
-    const newRoomPasswordInputEl = document.getElementById("newRoomPassword") as HTMLInputElement;
-    const roomMaxPlEl = document.getElementById("newRoomMaxPlayers") as HTMLInputElement;
-    socket.emit("createRoom", { name: newRoomNameInputEl.value, password: newRoomPasswordInputEl.value, maxPlayers: parseInt(roomMaxPlEl.value) })
-    newRoomOverlayEl.classList.toggle("hidden");
-});
-
-overlayEl.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const inputEl: HTMLInputElement = keyboardLayerSelectorEl.querySelector(`input[name="keyLayout"]:checked`) as HTMLInputElement;
-    if (inputEl && inputEl.value === "qwerty" || inputEl.value === "colemak-dh") {
+    const inputEl: HTMLInputElement = document.querySelector(`input[name="keyLayout"]:checked`) as HTMLInputElement;
+    if (inputEl && (inputEl.value === "qwerty" || inputEl.value === "colemak-dh"))
         playerLayout = inputEl.value;
-    }
+    overlayEl.style.display = "none";
+    uiHandler.showPlayerUi(playerLayout);
+    ISREADY = true;
     const avatarIndex: number = Math.trunc(Math.random() * 42);
-    const checkedEl = gameRoomSelectorEl.querySelector(`input[type="radio"]:checked`) as HTMLInputElement;
-    const roomId = checkedEl?.value;
-    socket.emit("joinRoom", { playerName: playerNameEl.value, avatarIndex, roomId: roomId, password: roomPasswordEl.value });
-    console.log(socket.id);
+    socket.emit("userReady", { name: playerNameEl.value, avatarIndex });
 });
 
 //***************************************//
@@ -169,7 +148,6 @@ const flame2Anim: AnimationType = new Animation(cx, "./assets/flame2.png", 11, 4
 
 class Player implements PlayerType {
     id: string;
-    roomId: string;
     cls: "warrior"
     x: number; y: number;
     width: number; height: number;
@@ -184,9 +162,8 @@ class Player implements PlayerType {
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
     animations: { [key: string]: AnimationType };
 
-    constructor(id: string, animations: { [key: string]: AnimationType }, avatarIndex: number, namee: string, roomId: string) {
+    constructor(id: string, animations: { [key: string]: AnimationType }, avatarIndex: number, namee: string) {
         this.id = id;
-        this.roomId = roomId;
         this.cls = "warrior";
         this.x = 0;
         this.y = 0;
@@ -396,30 +373,6 @@ socket.on("connect", () => {
     primaryPlayerId = socket.id as string;
     ISREADY = false;
     overlayEl.style.display = "flex";
-    for (let i of Array.from(gameRoomSelectorEl.children)) {
-        i.remove();
-    }
-})
-
-socket.on("theRoomWasCreated", gameConfig => {
-    console.log(gameConfig);
-    uiHandler.appendGameRoom(gameConfig.name, gameConfig.id, gameConfig.maxPlayers, gameConfig.onlinePlayers, gameConfig.number)
-});
-
-socket.on("playerJoinedRoom", () => {
-    overlayEl.style.display = "none";
-    uiHandler.showPlayerUi(playerLayout);
-    ISREADY = true;
-    console.log("I am in");
-});
-
-socket.on("failedToValidateRoomPw", () => {
-    console.log("failedToValidateRoomPw")
-    roomPasswordEl.setCustomValidity("Entered password does not match selected room's password");
-    roomPasswordEl.reportValidity();
-    setTimeout(() => {
-        roomPasswordEl.setCustomValidity("");
-    }, 1000)
 });
 
 socket.on("gameData", (data) => {
@@ -427,7 +380,26 @@ socket.on("gameData", (data) => {
     map = data.MAP;
     obstacles = data.OBSTACLES;
 
-    uiHandler.showGameRooms(data.gameRooms);
+    //let inputsList = gameRoomsContainer.querySelector(`input[value="gameRoom3"]`);
+    //console.log(inputsList);
+    for (let i = 0; i < data.gameRooms.length; i++) {
+        /*
+                <label for="gameRoom1"> Game Room </label>
+                <input id="gameRoom" type="radio" value="gameRoomID" name="gameRoom">
+        */
+        console.log(data.gameRooms[i]);
+        let labelEl = document.createElement("label")
+        labelEl.htmlFor = data.gameRooms[i].id;
+        labelEl.textContent = data.gameRooms[i].name;
+        let radioInput = document.createElement("input");
+        radioInput.name = "gameRooms";
+        radioInput.value = data.gameRooms[i].id;
+        radioInput.type = "radio";
+        gameRoomsContainer.append(labelEl);
+        gameRoomsContainer.append(radioInput);
+
+
+    }
 });
 
 socket.on("playersData", ({ pl, bl, bffs }) => {
@@ -437,7 +409,7 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
                 "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
                 "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
                 "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 3, 100, 100, 96, 96),
-            }, pl[p].avatarIndex, pl[p].name, pl[p].roomId);
+            }, pl[p].avatarIndex, pl[p].name);
         }
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;
@@ -626,19 +598,14 @@ animate();
 export type GameRoomsType = {
     id: string;
     name: string;
-    maxPlayers: number;
-    onlinePlayers: number;
 }
 export interface ServerToClientEvents {
     gameData: (data: { MAP: MapType, OBSTACLES: MapType, gameRooms: GameRoomsType[] }) => void;
-    theRoomWasCreated: (gameConfig: { name: string; id: string, number: number, maxPlayers: number, onlinePlayers: number }) => void;
     playersData: (data: { pl: { [key: string]: PlayerTypeServer }, bl: BulletType[], bffs: BuffObjectType[] }) => void;
     damageTaken: (dmgDetails: { damage: number; isCrit: boolean }) => void;
     damageDealt: (dmgDetails: { to: string; damage: number; isCrit: boolean }) => void;
     playerBuffCollision: (data: { name: string; buff: { name: string, tier: 1 | 2 | 3 } }) => void;
     playerBuffExpire: (data: { name: string, buffName: string }) => void;
-    failedToValidateRoomPw: () => void;
-    playerJoinedRoom: () => void;
 }
 
 export interface ClientToServerEvents {
@@ -648,8 +615,7 @@ export interface ClientToServerEvents {
     dash: () => void;
     attackMelee1: () => void;
     stopAttacking: (state: "idle" | "run" | "attack") => void;
-    joinRoom: (config: { roomId: string, playerName: string, avatarIndex: number, password: string }) => void;
-    createRoom: (data: { name: string, password: string, maxPlayers: number }) => void;
+    joinRoom: () => void;
 }
 
 export interface InterServerEvents {
@@ -677,7 +643,6 @@ export interface DamageNumbersType {
 
 export interface PlayerType {
     id: string;
-    roomId: string;
     cls: "warrior"
     x: number; y: number;
     width: number; height: number;
@@ -703,7 +668,6 @@ export interface PlayerType {
 
 export interface PlayerTypeServer {
     id: string;
-    roomId: string;
     name: string;
     avatarIndex: number;
     x: number; hbPaddingX: number;

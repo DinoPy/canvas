@@ -1,6 +1,6 @@
 import fs from "fs";
 import { TILE_SIZE, BUFFS, OBSTACLES } from "./constants";
-import { MapType, SquareColisionParams, PlayerType, PlayerStats, BuffKey} from "./types";
+import { MapType, SquareColisionParams, PlayerType, PlayerStats, BuffKey } from "./types";
 
 // MAP PARSING FUNCTION
 export function parseCsvMap(mapName: "mapDesert_Ground" | "mapDesert_Objects") {
@@ -9,13 +9,13 @@ export function parseCsvMap(mapName: "mapDesert_Ground" | "mapDesert_Objects") {
     section.pop();
     const map2D = section.map(s => s.split(",").map(n => {
         const id = parseInt(n);
-        return id >= 0 ? {id} : undefined;
+        return id >= 0 ? { id } : undefined;
     }));
     return map2D;
 }
 
 // AID TO GAME LOGIC
- export const isSquareColiding = (sq1: SquareColisionParams, sq2: SquareColisionParams) => {
+export const isSquareColiding = (sq1: SquareColisionParams, sq2: SquareColisionParams) => {
     if (sq1.x + sq1.width + sq2.width > sq2.x + sq2.width &&
         sq1.x <= sq2.x + sq2.width &&
         sq1.y + sq1.height + sq2.height >= sq2.y + sq2.height &&
@@ -166,3 +166,12 @@ export function merge<T extends Record<string, any>>(obj1: T, obj2: T, action: "
     return result as T;
 }
 
+
+export const UUIDGeneratorBrowser = (): string => {
+    //@ts-ignore
+  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).toString().replace(/[018]/g, (c) => {
+    const random = crypto.getRandomValues(new Uint8Array(1))[0];
+    const randomHex = random & (15 >> (c / 4));
+    return (c ^ randomHex).toString(16);
+  });
+};

@@ -10,16 +10,35 @@
 
 <body oncontextmenu="return false">
     <form class="overlay" id="overlay">
-        <input id="playerName" class="playerName" type="text" name="name" value="" placeholder="Player name"
+        <input id="playerName" class="playerName inputs" type="text" name="name" value="" placeholder="Player name"
             minlength="2" maxlength="12" required>
-        <fieldset>
+        <fieldset id="keyboardLayersContainer">
             <legend> Select your keyboard layout </legend>
-            <label for="querty"> Querty </label>
+            <label for="qwerty"> Qwerty </label>
             <input id="keyLayout" type="radio" value="qwerty" name="keyLayout" checked>
             <label for="colemak-dh"> Colemak-DH </label>
             <input id="keyLayout" type="radio" value="colemak-dh" name="keyLayout">
         </fieldset>
-        <button type="submit" class="submitBtn"> Submit </button>
+        <fieldset class="roomsContainer">
+            <legend> Select Room </legend>
+            <div id="gameRooms" style="display: inline;"> </div>
+            <div class="newRoomBtnBox">
+                <button type="button" id="newGameRoom" class="overlayBtn actionBtn" title="New Room"> + </button>
+            </div>
+            <div id="newRoomOverlay" class="hidden newRoomBox">
+                <div class="newRoomInnerOverlay">
+                    <input id="newRoomName" class="inputs inputQuadSize" type="text" name="newRoomName" value=""
+                        placeholder="Name">
+                    <input id="newRoomPassword" class="inputs inputQuadSize" type="text" name="newRoomPassword"
+                        placeholder="Room Pass">
+                    <input id="newRoomMaxPlayers" class="inputs inputQuadSize" type="number" name="newRoomMaxPlayers"
+                        placeholder="Max Players" min="2" max="10" value="5" title="Max Players">
+                </div>
+                <button type="button" id="addNewRoom" class="overlayBtn actionBtn newRoomAddBtn"> Add </button>
+            </div>
+        </fieldset>
+        <input id="selectedRoomPassword" class="inputs" placeholder="Room Password" />
+        <button type="submit" class="submitBtn overlayBtn" id="overlaySubmitBtn"> Submit </button>
     </form>
 
     <div class="players-overlay hidden" id="playersOverlay"> </div>

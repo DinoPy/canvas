@@ -1,8 +1,9 @@
 import { isNonEmptyObj } from "./utility.js";
 const abilitiesEl = document.getElementById("abilitiesEl");
 const playersEl = document.getElementById("playersOverlay");
+const gameRoomsContainer = document.getElementById("gameRooms");
 export const keyboardMaps = {
-    "querty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
     "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
 };
 export class ElHandler {
@@ -38,6 +39,25 @@ export class GameUiHandler {
         this.playerEls = {};
         this.cx = cx;
     }
+    appendGameRoom(name, id, maxPlayers, onlinePlayers, i) {
+        let labelEl = document.createElement("label");
+        labelEl.htmlFor = id;
+        labelEl.textContent = `${name} - ${onlinePlayers}/${maxPlayers}`;
+        let radioInput = document.createElement("input");
+        radioInput.name = "gameRooms";
+        radioInput.value = id;
+        radioInput.type = "radio";
+        if (i === 0)
+            radioInput.checked = true;
+        gameRoomsContainer.append(labelEl);
+        gameRoomsContainer.append(radioInput);
+    }
+    showGameRooms(gameRooms) {
+        for (let i = 0; i < gameRooms.length; i++) {
+            this.appendGameRoom(gameRooms[i].name, gameRooms[i].id, gameRooms[i].maxPlayers, gameRooms[i].onlinePlayers, i);
+        }
+    }
+    //********  PLAYER SKILLS   ****************//
     showPlayerUi(layout) {
         this.setUpSkillSlotKeys(layout);
         abilitiesEl.classList.remove("hidden");
