@@ -1,10 +1,12 @@
-import { BuffKey, BuffType, PlayerType } from ".";
+import { BuffKey, BuffType, GameRoomsType, PlayerType } from ".";
 import { isNonEmptyObj } from "./utility.js";
 
 const abilitiesEl = document.getElementById("abilitiesEl") as HTMLDivElement;
 const playersEl = document.getElementById("playersOverlay") as HTMLDivElement;
+const gameRoomsContainer = document.getElementById("gameRooms") as HTMLDivElement;
+
 export const keyboardMaps: KeyboardMapsType = {
-    "querty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
     "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
 }
 
@@ -49,6 +51,30 @@ export class GameUiHandler {
         this.playerEls = {};
         this.cx = cx;
     }
+
+    appendGameRoom (name: string, id: string, maxPlayers: number, onlinePlayers: number, i:number) {
+            let labelEl = document.createElement("label")
+            labelEl.htmlFor = id;
+            labelEl.textContent = `${name} - ${onlinePlayers}/${maxPlayers}`;
+            let radioInput = document.createElement("input");
+            radioInput.name = "gameRooms";
+            radioInput.value = id;
+            radioInput.type = "radio";
+            if (i === 0)
+                radioInput.checked = true;
+            gameRoomsContainer.append(labelEl);
+            gameRoomsContainer.append(radioInput);
+    }
+
+    showGameRooms(gameRooms: GameRoomsType[]) {
+        for (let i = 0; i < gameRooms.length; i++) {
+            this.appendGameRoom(gameRooms[i].name, gameRooms[i].id, gameRooms[i].maxPlayers, gameRooms[i].onlinePlayers, i);
+        }
+    }
+
+
+
+    //********  PLAYER SKILLS   ****************//
 
     showPlayerUi(layout: keyof KeyboardMapsType) {
         this.setUpSkillSlotKeys(layout);
@@ -196,7 +222,7 @@ type LayoutType = {
 };
 
 type KeyboardMapsType = {
-    "querty": LayoutType;
+    "qwerty": LayoutType;
     "colemak-dh": LayoutType;
 }
 

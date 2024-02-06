@@ -1,17 +1,23 @@
 
 export interface ServerToClientEvents {
-    map: (data: { MAP: MapType, OBSTACLES: MapType }) => void;
-    playersData: (data: { pl: { [key: string]: PlayerType }, bl: BulletType[], bffs: BuffObjectType[] }) => void;
+    gameData: (data: { MAP: MapType, OBSTACLES: MapType, gameRooms: GameRoomsType[] }) => void;
+    playersData: (data: { pl: { [key: string]: PlayerType }, bl: ProjectileType[], bffs: BuffObjectType[] }) => void;
     damageTaken: (dmgDetails: { damage: number; isCrit: boolean }) => void;
     damageDealt: (dmgDetails: { to: string; damage: number; isCrit: boolean }) => void;
     playerBuffCollision: (data: { name: string; buff: { name: string, tier: number } }) => void;
     playerBuffExpire: (data: { name: string, buffName: string }) => void;
+    theRoomWasCreated: (gameConfig: { name: string; id: string, number: number, maxPlayers: number, onlinePlayers: number}) => void;
+    failedToValidateRoomPw: () => void;
+    playerJoinedRoom: () => void;
+
 }
 
 export interface ClientToServerEvents {
+    createRoom: (data: { name: string, password: string, maxPlayers:number }) => void;
+    joinRoom: (config: { roomId: string, playerName: string, avatarIndex: number, password: string}) => void;
     userReady: (data: { name: string; avatarIndex: number }) => void;
     playerMovement: (controls: keyControlsType) => void;
-    shoot: (bullet: emitBulletArgType) => void;
+    shoot: (bullet: emitProjectileArgType) => void;
     dash: () => void;
     attackMelee1: () => void;
     stopAttacking: (state: "idle" | "run" | "attack") => void;
@@ -22,12 +28,30 @@ export interface InterServerEvents {
 }
 
 export interface SocketData {
+    roomId: string;
 }
+
+export type GameRoomsType = {
+    id: string;
+    name: string;
+    maxPlayers: number;
+    onlinePlayers: number;
+}
+export interface GameType {
+    name: string;
+    id: string;
+    gameConfig: { maxPlayers: number };
+    pickableBuffConfig: { respawnTime: number; maxNumber: number };
+    players: { [key: string]: PlayerType };
+    projectiles: ProjectileType[];
+    pickableBuffs: BuffObjectType[];
+};
 
 export interface PlayerType {
     id: string;
     name: string;
     avatarIndex: number;
+    roomId: string;
     x: number; hbPaddingX: number;
     y: number; hbPaddingY: number;
     width: number; hbWidth: number;
@@ -37,7 +61,7 @@ export interface PlayerType {
     isAttacking: boolean;
     state: "idle" | "attack" | "run";
     direction: "down" | "up" | "left" | "right";
-    bulletCount: number;
+    projectileCount: number;
     dash: { isDashing: boolean, dashStart: null | number, cooldown: number, dashDuration: number };
     attack1_alreadyHit: string[];
     playerStats: PlayerStats;
@@ -45,11 +69,12 @@ export interface PlayerType {
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
 }
 
-export interface BulletType {
+export interface ProjectileType {
     x: number; width: number;
     y: number; height: number;
     angle: number;
     ownerId: string;
+    roomId: string;
     life: number;
     score: number;
 }
@@ -61,6 +86,7 @@ export interface BuffObjectType {
     createdAt: Date;
     name: string;
     tier: number;
+    roomId: string;
 }
 
 export interface PlayerStats {
@@ -72,37 +98,30 @@ export interface PlayerStats {
     movement: { speed: number; multiplier: number; };
 }
 
-export type InnerBuffProps = MovementBuff | RegenBuff | AttackArmorBuff | CritBuff;
-export type BuffProps = { [key in innerPropTypes]: number };
+export type InnerBuffProps = { speed: number; multiplier: number; } | { amount: number; multiplier: number } | { physical?: number; physicalMultiplier?: number; magic?: number, magicMultiplier?: number } | { physical?: number; physicalMultiplier?: number; magic?: number, magicMultiplier?: number } | { physicalRate?: number; magicRate?: number; physicalDamage?: number; magicDamage?: number };
 
 export type BuffKey = "minorSwiftness" | "mediumSwiftness" | "majorSwiftness" | "rejuvenationMinor" | "rejuvenationMedium" | "rejuvenationMajor" |
     "minorFortification" | "mediumFortification" | "majorFortification" | "minorWarding" | "mediumWarding" | "majorWarding" |
     "minorStrengthening" | "mediumStrengthening" | "majorStrengthening" | "minorEnchantment" | "mediumEnchantment" | "majorEnchantment" |
     "minorPrecision" | "mediumPrecision" | "majorPrecision" | "minorDevastation" | "mediumDevastation" | "majorDevastation"
 
-export type innerPropTypes = "lastRegen" | "amount" | "multiplier" | "interval" | "max" | "current" | "physicalRate" | "physicalDamage" | "magicRate" | "magicDamage" | "physical" | "physicalMultiplier" | "magic" | "magicMultiplier" | "speed";
-
-export type MovementBuff = {speed: number; multiplier: number };
-export type RegenBuff = {amount: number; multiplier: number };
-export type AttackArmorBuff = {physical?: number; physicalMultiplier?: number; magic?: number; magicMultiplier?: number };
-export type CritBuff = {physicalRate?: number; magicRate?: number; physicalDamage?: number; magicDamage?: number};
 
 export type BuffList = {
-    movement?: MovementBuff;
-    regen?: RegenBuff;
-    armor?: AttackArmorBuff;
-    attack?: AttackArmorBuff;
-    crit?: CritBuff;
+    movement?: InnerBuffProps;
+    regen?: InnerBuffProps;
+    armor?: InnerBuffProps;
+    attack?: InnerBuffProps;
+    crit?: InnerBuffProps;
 }
 
 export type BuffType<K extends BuffKey> = {
-    [key in K]: { duration: number; name: string; tier: 1 | 2 | 3 } & BuffList;
+    [key in K]: { duration: number; name: string; tier: number } & BuffList;
 }
 
 export type MapType = ({ id: number } | undefined)[][];
 
 export type keyControlsType = { up: boolean, down: boolean, left: boolean, right: boolean };
 
-export type emitBulletArgType = { angle: number; x: number; y: number };
+export type emitProjectileArgType = { angle: number; x: number; y: number };
 
 export interface SquareColisionParams { x: number; y: number; width: number; height: number }

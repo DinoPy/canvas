@@ -20,19 +20,39 @@ uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
 const els = uiHandler.returnSkillSlots();
 const overlayEl = document.getElementById("overlay");
 const playerNameEl = document.getElementById("playerName");
+const keyboardLayerSelectorEl = document.getElementById("keyboardLayersContainer");
+const newRoomToggleEl = document.getElementById("newGameRoom");
+const gameRoomSelectorEl = document.getElementById("gameRooms");
+const newRoomOverlayEl = document.getElementById("newRoomOverlay");
+const newRoomAddEl = document.getElementById("addNewRoom");
+const roomPasswordEl = overlayEl.querySelector("#selectedRoomPassword");
 let playerLayout = "colemak-dh";
 let ISREADY = false;
 let primaryPlayerId = "";
-addEventListener("submit", (e) => {
+newRoomToggleEl.addEventListener("click", (e) => {
     e.preventDefault();
-    const inputEl = document.querySelector(`input[name="keyLayout"]:checked`);
-    if (inputEl && (inputEl.value === "querty" || inputEl.value === "colemak-dh"))
+    roomPasswordEl.setCustomValidity("");
+    roomPasswordEl.reportValidity();
+    newRoomOverlayEl.classList.toggle("hidden");
+});
+newRoomAddEl.addEventListener("click", (e) => {
+    const newRoomNameInputEl = document.getElementById("newRoomName");
+    const newRoomPasswordInputEl = document.getElementById("newRoomPassword");
+    const roomMaxPlEl = document.getElementById("newRoomMaxPlayers");
+    socket.emit("createRoom", { name: newRoomNameInputEl.value, password: newRoomPasswordInputEl.value, maxPlayers: parseInt(roomMaxPlEl.value) });
+    newRoomOverlayEl.classList.toggle("hidden");
+});
+overlayEl.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const inputEl = keyboardLayerSelectorEl.querySelector(`input[name="keyLayout"]:checked`);
+    if (inputEl && inputEl.value === "qwerty" || inputEl.value === "colemak-dh") {
         playerLayout = inputEl.value;
-    overlayEl.style.display = "none";
-    uiHandler.showPlayerUi(playerLayout);
-    ISREADY = true;
+    }
     const avatarIndex = Math.trunc(Math.random() * 42);
-    socket.emit("userReady", { name: playerNameEl.value, avatarIndex });
+    const checkedEl = gameRoomSelectorEl.querySelector(`input[type="radio"]:checked`);
+    const roomId = checkedEl?.value;
+    socket.emit("joinRoom", { playerName: playerNameEl.value, avatarIndex, roomId: roomId, password: roomPasswordEl.value });
+    console.log(socket.id);
 });
 //***************************************//
 //************** CONTROLS  *****************//
@@ -149,6 +169,7 @@ const flame1Anim = new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 
 const flame2Anim = new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220);
 class Player {
     id;
+    roomId;
     cls;
     x;
     y;
@@ -164,8 +185,9 @@ class Player {
     bulletCount;
     buffs;
     animations;
-    constructor(id, animations, avatarIndex, namee) {
+    constructor(id, animations, avatarIndex, namee, roomId) {
         this.id = id;
+        this.roomId = roomId;
         this.cls = "warrior";
         this.x = 0;
         this.y = 0;
@@ -340,11 +362,33 @@ socket.on("connect", () => {
     primaryPlayerId = socket.id;
     ISREADY = false;
     overlayEl.style.display = "flex";
+    for (let i of Array.from(gameRoomSelectorEl.children)) {
+        i.remove();
+    }
 });
-socket.on("map", (m) => {
-    console.log(m);
-    map = m.MAP;
-    obstacles = m.OBSTACLES;
+socket.on("theRoomWasCreated", gameConfig => {
+    console.log(gameConfig);
+    uiHandler.appendGameRoom(gameConfig.name, gameConfig.id, gameConfig.maxPlayers, gameConfig.onlinePlayers, gameConfig.number);
+});
+socket.on("playerJoinedRoom", () => {
+    overlayEl.style.display = "none";
+    uiHandler.showPlayerUi(playerLayout);
+    ISREADY = true;
+    console.log("I am in");
+});
+socket.on("failedToValidateRoomPw", () => {
+    console.log("failedToValidateRoomPw");
+    roomPasswordEl.setCustomValidity("Entered password does not match selected room's password");
+    roomPasswordEl.reportValidity();
+    setTimeout(() => {
+        roomPasswordEl.setCustomValidity("");
+    }, 1000);
+});
+socket.on("gameData", (data) => {
+    console.log(data);
+    map = data.MAP;
+    obstacles = data.OBSTACLES;
+    uiHandler.showGameRooms(data.gameRooms);
 });
 socket.on("playersData", ({ pl, bl, bffs }) => {
     for (let p in pl) {
@@ -353,7 +397,7 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
                 "warriorrun": new Animation(cx, "./assets/warrior_run.png", 15, 2, 100, 100, 96, 96),
                 "warrioridle": new Animation(cx, "./assets/warrior_idle.png", 30, 3, 100, 100, 96, 96),
                 "warriorattack": new Animation(cx, "./assets/warrior_attack.png", 15, 3, 100, 100, 96, 96),
-            }, pl[p].avatarIndex, pl[p].name);
+            }, pl[p].avatarIndex, pl[p].name, pl[p].roomId);
         }
         players[pl[p].id].x = pl[p].x;
         players[pl[p].id].y = pl[p].y;

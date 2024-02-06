@@ -1,11 +1,12 @@
-import { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData, PlayerStats, BuffType, BuffKey, MapType, keyControlsType, BuffList, InnerBuffProps, PlayerType, innerPropTypes, BuffProps } from "./types.ts";
 import path from "path";
 import { createServer } from "http";
 import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 
-import { isAttackColiding, isSquareColiding, parseCsvMap, isColidingWithEnvironment, generateRespawnCoords, merge } from "./utility.ts";
+import { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData, PlayerStats, BuffKey, keyControlsType, BuffList, PlayerType, ProjectileType, BuffObjectType, GameType } from "./types.ts";
+import { MAP, OBSTACLES, TICK_RATE, TILE_SIZE, BUFFS } from "./constants.ts";
+import { isAttackColiding, isSquareColiding, isColidingWithEnvironment, generateRespawnCoords, spawnRandomBuff, UUIDGeneratorBrowser } from "./utility.ts";
 
 const app: Express = express();
 const httpServer = createServer(app);
@@ -27,56 +28,80 @@ app.get("/", (req: Request, res: Response) => {
     res.send("Home to TS converted server");
 });
 
-const MAP: MapType = parseCsvMap("mapDesert_Ground");
-const OBSTACLES: MapType = parseCsvMap("mapDesert_Objects");
-const TICK_RATE: number = 60;
-const BULLET_SPEED: number = 25;
-const TILE_SIZE: number = 32;
+//io.path("/game");
 
-const BUFFS: BuffType<BuffKey> = {
-    minorSwiftness: { movement: { speed: 0, multiplier: 0.2 }, duration: 30, name: "Minor Swiftness", tier: 1 },
-    mediumSwiftness: { movement: { speed: 0, multiplier: 0.4 }, duration: 22, name: "Medium Swiftness", tier: 2 },
-    majorSwiftness: { movement: { speed: 0, multiplier: 0.6 }, duration: 15, name: "Major Swiftness", tier: 3 },
-    rejuvenationMinor: { regen: { amount: 0, multiplier: 0.25 }, duration: 30, name: "Minor Rejuvenation", tier: 1 },
-    rejuvenationMedium: { regen: { amount: 0, multiplier: 0.50 }, duration: 22, name: "Medium Rejuvenation", tier: 2 },
-    rejuvenationMajor: { regen: { amount: 0, multiplier: 1 }, duration: 15, name: "Major Rejuvenation", tier: 3 },
-    minorFortification: { armor: { physical: 0, physicalMultiplier: 0.25 }, duration: 30, name: "Minor Fortification", tier: 1 },
-    mediumFortification: { armor: { physical: 0, physicalMultiplier: 0.50 }, duration: 22, name: "Medium Fortification", tier: 2 },
-    majorFortification: { armor: { physical: 0, physicalMultiplier: 1 }, duration: 15, name: "Major Fortification", tier: 3 },
-    minorWarding: { armor: { magic: 0, magicMultiplier: 0.25 }, duration: 30, name: "Minor Warding", tier: 1 },
-    mediumWarding: { armor: { magic: 0, magicMultiplier: 0.50 }, duration: 22, name: "Medium Warding", tier: 2 },
-    majorWarding: { armor: { magic: 0, magicMultiplier: 1 }, duration: 15, name: "Major Warding", tier: 3 },
-    minorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.2 }, duration: 30, name: "Minor Strengthening", tier: 1 },
-    mediumStrengthening: { attack: { physical: 0, physicalMultiplier: 0.4 }, duration: 22, name: "Medium Strengthening", tier: 2 },
-    majorStrengthening: { attack: { physical: 0, physicalMultiplier: 0.6 }, duration: 15, name: "Major Strengthening", tier: 3 },
-    minorEnchantment: { attack: { magic: 0, magicMultiplier: 0.2 }, duration: 30, name: "Minor Enchantment", tier: 1 },
-    mediumEnchantment: { attack: { magic: 0, magicMultiplier: 0.4 }, duration: 22, name: "Medium Enchantment", tier: 2 },
-    majorEnchantment: { attack: { magic: 0, magicMultiplier: 0.6 }, duration: 15, name: "Major Enchantment", tier: 3 },
-    minorPrecision: { crit: { physicalRate: 0.05, magicRate: 0.05 }, duration: 30, name: "Minor Precision", tier: 1 },
-    mediumPrecision: { crit: { physicalRate: 0.1, magicRate: 0.1 }, duration: 22, name: "Medium Precision", tier: 2 },
-    majorPrecision: { crit: { physicalRate: 0.15, magicRate: 0.15 }, duration: 15, name: "Major Precision", tier: 3 },
-    minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 30, name: "Minor Devastation", tier: 1 },
-    mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 22, name: "Medium Devastation", tier: 2 },
-    majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
-}
+class Game implements GameType {
+    name: string;
+    id: string;
+    password: string;
+    gameConfig: { maxPlayers: number };
+    pickableBuffConfig: { respawnTime: number; maxNumber: number };
+    players: PlayerListType;
+    projectiles: Projectile[];
+    pickableBuffs: Buff[];
+    lastPlayed: number;
 
-type spawnRandomBuffType = () => { x: number, y: number, buff: BuffKey };
-const spawnRandomBuff: spawnRandomBuffType = () => {
-    const buffsList: BuffKey[] = Object.keys(BUFFS) as BuffKey[];
-    const randomBuff = buffsList[Math.floor(Math.random() * buffsList.length)];
-    const coords = generateRespawnCoords(OBSTACLES);
+    constructor(roomObj: { name: string; id: string; password: string, maxPlayers: number }) {
+        this.name = roomObj.name;
+        this.id = roomObj.id;
+        this.password = roomObj.password;
+        this.gameConfig = { maxPlayers: roomObj.maxPlayers };
+        this.pickableBuffConfig = { respawnTime: 7000, maxNumber: 3 };
+        this.players = {};
+        this.projectiles = [];
+        this.pickableBuffs = [];
+        this.lastPlayed = +new Date;
 
-    return {
-        x: coords.x,
-        y: coords.y,
-        buff: randomBuff,
+
+        setInterval(() => {
+            if (this.pickableBuffs.length >= this.pickableBuffConfig.maxNumber) return;
+            const newPickableBuff = spawnRandomBuff();
+            const currentBuff = BUFFS[newPickableBuff.buff];
+            this.pickableBuffs.push(new Buff(newPickableBuff.x, newPickableBuff.y, newPickableBuff.buff, currentBuff.duration, currentBuff.name, currentBuff.tier, this.id));
+        }, 2000);
+
+        // The game room will erase itself if not played for more than ~10 minutes
+        // This interval exists x number of rooms, not good.
+        setInterval(() => {
+            if (Object.keys(this.players).length > 0) this.lastPlayed = +new Date;
+            if (+new Date - this.lastPlayed > 1000 * 60 * 10) delete games[this.id];
+        }, 1000 * 60 * 5);
     };
+
+    tick(delta: number) {
+        if (Object.keys(this.players).length > 0) {
+            for (let pl in this.players) {
+                this.players[pl].checkState();
+                this.players[pl].move();
+                this.players[pl].attackCheckHit();
+                this.players[pl].updateDashStatus();
+                this.players[pl].triggerRegen();
+                this.players[pl].updateBuffs();
+                this.players[pl].checkColisionWithBuff();
+            }
+
+            for (let i in this.projectiles) {
+                this.projectiles[i].move(delta);
+                this.projectiles[i].checkHit();
+            }
+            this.projectiles = this.projectiles.filter((proj: Projectile) => {
+                let isAlive = proj.life > 0;
+                if (!isAlive && this.players[proj.ownerId]?.projectileCount)
+                    this.players[proj.ownerId].projectileCount--;
+                return isAlive;
+            });
+
+            io.to(this.id).emit("playersData", { pl: this.players, bl: this.projectiles, bffs: this.pickableBuffs });
+        }
+    }
+
 };
 
-class Player {
+class Player implements PlayerType {
     id: string;
     name: string;
     avatarIndex: number;
+    roomId: string;
     x: number; hbPaddingX: number;
     y: number; hbPaddingY: number;
     width: number; hbWidth: number;
@@ -86,17 +111,18 @@ class Player {
     isAttacking: boolean;
     state: "idle" | "attack" | "run";
     direction: "down" | "up" | "left" | "right";
-    bulletCount: number;
+    projectileCount: number;
     dash: { isDashing: boolean, dashStart: null | number, cooldown: number, dashDuration: number };
     attack1_alreadyHit: string[];
     playerStats: PlayerStats;
     playerBuffStats: PlayerStats;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
 
-    constructor(id: string, x: number, y: number, name: string, avatarIndex: number) {
+    constructor(id: string, x: number, y: number, name: string, avatarIndex: number, roomId: string) {
         this.id = id;
         this.name = name;
         this.avatarIndex = avatarIndex;
+        this.roomId = roomId;
         this.x = x; this.hbPaddingX = 25;
         this.y = y; this.hbPaddingY = 10;
         this.width = 96; this.hbWidth = 45;
@@ -111,7 +137,7 @@ class Player {
         this.isAttacking = false;
         this.state = "idle";
         this.direction = "down";
-        this.bulletCount = 0;
+        this.projectileCount = 0;
         this.dash = {
             isDashing: false,
             dashStart: null,
@@ -230,22 +256,23 @@ class Player {
     }
 
     attackCheckHit() {
-        for (let p in players)
+        for (let p in games[this.roomId].players)
             if (p !== this.id) {
                 if (this.isAttacking && !this.attack1_alreadyHit.includes(p)) {
-                    if (isAttackColiding(this, players[p]) && !players[p].dash.isDashing) {
+                    const playerList = games[this.roomId].players;
+                    if (isAttackColiding(this, playerList[p]) && !playerList[p].dash.isDashing) {
                         this.attack1_alreadyHit.push(p);
-                        const dmgDetails = Player.calculateDamage(players[this.id], players[p], "physical", 1);
-                        players[p].playerStats.life.current -= dmgDetails.damage;
+                        const dmgDetails = Player.calculateDamage(playerList[this.id], playerList[p], "physical", 1);
+                        playerList[p].playerStats.life.current -= dmgDetails.damage;
                         io.to(p).emit("damageTaken", dmgDetails);
                         io.to(this.id).emit("damageDealt", { to: p, ...dmgDetails });
                     }
 
-                    if (players[p].playerStats.life.current <= 0) {
+                    if (playerList[p].playerStats.life.current <= 0) {
                         const coords = generateRespawnCoords(OBSTACLES);
-                        players[p].x = coords.x;
-                        players[p].y = coords.y;
-                        players[p].playerStats.life.current = players[p].playerStats.life.max;
+                        playerList[p].x = coords.x;
+                        playerList[p].y = coords.y;
+                        playerList[p].playerStats.life.current = playerList[p].playerStats.life.max;
                     }
                 }
             }
@@ -284,7 +311,8 @@ class Player {
     }
 
     checkColisionWithBuff() {
-        for (let index in buffs) {
+        const currRoomPickableBuffs = games[this.roomId].pickableBuffs;
+        for (let index in currRoomPickableBuffs) {
             if (isSquareColiding(
                 {
                     x: this.x + this.hbPaddingX,
@@ -292,10 +320,10 @@ class Player {
                     width: this.hbWidth,
                     height: this.hbHeight
                 },
-                { x: buffs[index].x, y: buffs[index].y, width: 32, height: 32 },
+                { x: currRoomPickableBuffs[index].x, y: currRoomPickableBuffs[index].y, width: 32, height: 32 },
             )) {
-                Buff.applyToPlayer(players[this.id], buffs[index].type);
-                buffs.splice(parseInt(index), 1)
+                Buff.applyToPlayer(games[this.roomId].players[this.id], games[this.roomId].pickableBuffs[index].type);
+                games[this.roomId].pickableBuffs.splice(parseInt(index), 1)
             }
         }
     }
@@ -316,19 +344,21 @@ class Player {
     }
 }
 
-class Bullet {
+class Projectile implements ProjectileType {
     x: number; width: number;
     y: number; height: number;
     angle: number;
     ownerId: string;
+    roomId: string;
     life: number;
     score: number;
     velocity: number;
-    constructor(x: number, y: number, angle: number, ownerId: string) {
+    constructor(x: number, y: number, angle: number, ownerId: string, roomId: string) {
         this.x = x; this.width = 16;
         this.y = y; this.height = 11;
         this.angle = angle;
         this.ownerId = ownerId;
+        this.roomId = roomId;
         this.life = 1000;
         this.score = 0;
         this.velocity = 30;
@@ -344,44 +374,46 @@ class Bullet {
     }
 
     checkHit() {
-        for (let p in players)
+        const playerList = games[this.roomId].players;
+        for (let p in playerList)
             if (p !== this.ownerId) {
                 if (isSquareColiding(
                     {
-                        x: players[p].x + players[p].hbPaddingX,
-                        y: players[p].y + players[p].hbPaddingY,
-                        width: players[p].hbWidth,
-                        height: players[p].hbHeight
+                        x: playerList[p].x + playerList[p].hbPaddingX,
+                        y: playerList[p].y + playerList[p].hbPaddingY,
+                        width: playerList[p].hbWidth,
+                        height: playerList[p].hbHeight
                     },
                     { x: this.x, y: this.y, width: this.width, height: this.height },
                 )) {
-                    if (!players[p].dash.isDashing) {
-                        const dmgDetails = Player.calculateDamage(players[this.ownerId], players[p], "physical", 0.6);
-                        players[p].playerStats.life.current -= dmgDetails.damage;
+                    if (!playerList[p].dash.isDashing) {
+                        const dmgDetails = Player.calculateDamage(playerList[this.ownerId], playerList[p], "physical", 0.6);
+                        playerList[p].playerStats.life.current -= dmgDetails.damage;
                         io.to(p).emit("damageTaken", dmgDetails);
                         io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
                     }
                     this.life = 0;
                 }
 
-                if (players[p].playerStats.life.current <= 0) {
+                if (playerList[p].playerStats.life.current <= 0) {
                     const coords = generateRespawnCoords(OBSTACLES);
-                    players[p].x = coords.x;
-                    players[p].y = coords.y;
-                    players[p].playerStats.life.current = 100;
+                    playerList[p].x = coords.x;
+                    playerList[p].y = coords.y;
+                    playerList[p].playerStats.life.current = 100;
                 }
             }
     }
 }
 
-class Buff {
+class Buff implements BuffObjectType {
     x: number; y: number;
     type: BuffKey;
     duration: number;
     createdAt: Date;
     name: string;
     tier: number;
-    constructor(x: number, y: number, type: BuffKey, duration: number, namee: string, tier: number) {
+    roomId: string;
+    constructor(x: number, y: number, type: BuffKey, duration: number, namee: string, tier: number, roomId: string) {
         this.x = x;
         this.y = y;
         this.type = type;
@@ -389,6 +421,7 @@ class Buff {
         this.createdAt = new Date;
         this.name = namee;
         this.tier = tier;
+        this.roomId = roomId;
     }
 
     static applyProperties(action: "apply" | "remove", p: PlayerType, buff: BuffKey) {
@@ -398,9 +431,9 @@ class Buff {
             for (let innerProp in BUFFS[buff][outerProp]) {
                 if (!p.playerBuffStats[outerProp].hasOwnProperty(innerProp)) continue;
                 action === "apply" ?
-                //@ts-ignore
+                    //@ts-ignore
                     p.playerBuffStats[outerProp][innerProp] = parseFloat((p.playerBuffStats[outerProp][innerProp] + BUFFS[buff][outerProp][innerProp]).toFixed(2)) :
-                //@ts-ignore
+                    //@ts-ignore
                     p.playerBuffStats[outerProp][innerProp] = parseFloat((p.playerBuffStats[outerProp][innerProp] - BUFFS[buff][prop][innerProp]).toFixed(2));
             }
         }
@@ -430,8 +463,8 @@ class Buff {
 
 }
 
-type resolveDupeNameType = (name: string, index: number) => string;
-const resolveDupeName: resolveDupeNameType = (name, index) => {
+type resolveDupeNameType = (name: string, index: number, players: PlayerListType) => string;
+const resolveDupeName: resolveDupeNameType = (name, index, players: PlayerListType) => {
     let currName = index === 1 ? name : name + index;
     console.log(currName);
     const sameNameCount = Object.keys(players).filter(id => players[id].name === currName);
@@ -439,69 +472,123 @@ const resolveDupeName: resolveDupeNameType = (name, index) => {
         return currName;
     else {
         index += 1;
-        return resolveDupeName(name, index);
+        return resolveDupeName(name, index, players);
     }
 
 }
 
 type PlayerListType = { [key: string]: Player };
-let players: PlayerListType = {};
-let bullets: Bullet[] = [];
-let buffs: Buff[] = [];
+let games: { [key: string]: Game } = {};
+
+const getExistingGameRooms = () => {
+    const gameIds = Object.keys(games);
+    if (gameIds.length === 0) {
+        return [];
+    }
+    return gameIds.map(gameId => {
+        return {
+            id: games[gameId].id,
+            name: games[gameId].name,
+            maxPlayers: games[gameId].gameConfig.maxPlayers,
+            onlinePlayers: Object.keys(games[gameId].players).length
+        };
+    });
+};
 
 async function main() {
     io.on("connection", (socket) => {
-        socket.join("default");
-        socket.on("userReady", (data) => {
-            const coords = generateRespawnCoords(OBSTACLES);
-            players[socket.id] = new Player(
-                socket.id,
-                coords.x,
-                coords.y,
-                resolveDupeName(data.name, 1),
-                data.avatarIndex
-            );
+        socket.emit("gameData", { MAP, OBSTACLES, gameRooms: getExistingGameRooms() });
+        socket.on("createRoom", (data) => {
+            let id = UUIDGeneratorBrowser();
+            const name = data.name.length > 0 ? data.name :
+                `Room ${Object.keys(games).length + 1}`
+            const gameConfig = { name: name, id: id, password: data.password, maxPlayers: data.maxPlayers };
+            games[id] = new Game(gameConfig);
+            io.emit("theRoomWasCreated", {
+                name,
+                id,
+                number: Object.keys(games).length - 1,
+                maxPlayers: data.maxPlayers,
+                onlinePlayers: Object.keys(games[id].players).length
+            });
+        });
+        socket.on("joinRoom", (config: { roomId: string, playerName: string, avatarIndex: number, password: string }) => {
+            let id: string = config.roomId || "";
+            if (Object.keys(games).length < 1) {
+                id = UUIDGeneratorBrowser();
+                games[id] = new Game({ id, name: "Room 1", password: "", maxPlayers: 5 })
+                io.emit("theRoomWasCreated", {
+                    name: "Room 1",
+                    id,
+                    number: Object.keys(games).length - 1,
+                    maxPlayers: 5,
+                    onlinePlayers: Object.keys(games[id].players).length
+                });
+            }
+            if (games[id].password === config.password) {
+                if ( Object.keys(games[id].players).length >= games[id].gameConfig.maxPlayers) return;
+                const coords = generateRespawnCoords(OBSTACLES);
+                games[id].players[socket.id] = new Player(
+                    socket.id,
+                    coords.x,
+                    coords.y,
+                    resolveDupeName(config.playerName, 1, games[id].players),
+                    config.avatarIndex,
+                    id,
+                );
+                socket.join(id);
+                socket.data.roomId = id;
+                io.to(socket.id).emit("playerJoinedRoom");
+            } else {
+                io.to(socket.id).emit("failedToValidateRoomPw");
+            }
+
         });
 
-        socket.emit("map", { MAP, OBSTACLES });
 
         socket.on("playerMovement", (controls) => {
-            if (players[socket.id])
-                players[socket.id].keyControls = controls;
+            const player = games[socket.data.roomId].players[socket.id];
+            if (player)
+                player.keyControls = controls;
         });
 
-        socket.on("shoot", (bullet) => {
-            if (players[socket.id]?.bulletCount < 1) {
-                players[socket.id].bulletCount++;
-                bullets.push(
-                    new Bullet(
-                        bullet.x,
-                        bullet.y,
-                        bullet.angle,
-                        socket.id
+        socket.on("shoot", (projectile) => {
+            const player = games[socket.data.roomId].players[socket.id];
+            if (player?.projectileCount < 1) {
+                player.projectileCount++;
+                games[socket.data.roomId].projectiles.push(
+                    new Projectile(
+                        projectile.x,
+                        projectile.y,
+                        projectile.angle,
+                        socket.id,
+                        socket.data.roomId,
                     ));
             }
         });
 
         socket.on("dash", () => {
-            players[socket.id].dash.isDashing = true;
-            players[socket.id].dash.dashStart = +new Date;
+            const player = games[socket.data.roomId].players[socket.id];
+            player.dash.isDashing = true;
+            player.dash.dashStart = +new Date;
         });
 
         socket.on("attackMelee1", () => {
-            players[socket.id].isAttacking = true;
-            players[socket.id].state = "attack";
+            const player = games[socket.data.roomId].players[socket.id];
+            player.isAttacking = true;
+            player.state = "attack";
         });
 
         socket.on("stopAttacking", (state) => {
-            players[socket.id].isAttacking = false;
-            players[socket.id].state = state;
-            players[socket.id].attack1_alreadyHit = [];
+            const player = games[socket.data.roomId].players[socket.id];
+            player.isAttacking = false;
+            player.state = state;
+            player.attack1_alreadyHit = [];
         });
 
         socket.on("disconnect", () => {
             console.log("disconnected: ", socket.id);
-            delete players[socket.id];
+            delete games[socket.data.roomId]?.players[socket.id];
         });
         console.log(socket.id, " connected");
     });
@@ -511,6 +598,7 @@ async function main() {
     });
 
 
+    /*
     async function tick(delta: number, players: { [key: string]: Player }) {
         for (let pl in players) {
             players[pl].checkState();
@@ -522,32 +610,29 @@ async function main() {
             players[pl].checkColisionWithBuff();
         }
 
-        for (let i in bullets) {
-            bullets[i].move(delta);
-            bullets[i].checkHit();
+        for (let i in projectiles) {
+            projectiles[i].move(delta);
+            projectiles[i].checkHit();
         }
-        bullets = bullets.filter((b: Bullet) => {
+        projectiles = projectiles.filter((b: Projectile) => {
             let isAlive = b.life > 0;
-            if (!isAlive && players[b.ownerId]?.bulletCount)
-                players[b.ownerId].bulletCount--;
+            if (!isAlive && players[b.ownerId]?.projectileCount)
+                players[b.ownerId].projectileCount--;
             return isAlive;
         });
 
-        io.emit("playersData", { pl: players, bl: bullets, bffs: buffs });
+        io.emit("playersData", { pl: players, bl: projectiles, bffs: buffs });
     };
+    */
 
-    setInterval(() => {
-        if (buffs.length >= 2) return;
-        const newBuff = spawnRandomBuff();
-        buffs.push(new Buff(newBuff.x, newBuff.y, newBuff.buff, BUFFS[newBuff.buff].duration, BUFFS[newBuff.buff].name, BUFFS[newBuff.buff].tier));
-    }, 2000);
 
     let lastUpdate = Date.now();
     setInterval(() => {
         const now = Date.now();
         const delta = now - lastUpdate;
-        if (Object.keys(players).length > 0)
-            tick(delta, players)
+        Object.keys(games).map((g) => {
+            games[g].tick(delta);
+        });
         lastUpdate = now;
     }, 1000 / TICK_RATE);
 }

@@ -1,18 +1,21 @@
 import fs from "fs";
-import { MapType, SquareColisionParams, PlayerType, PlayerStats} from "./types";
+import { TILE_SIZE, BUFFS, OBSTACLES } from "./constants";
+import { MapType, SquareColisionParams, PlayerType, PlayerStats, BuffKey } from "./types";
 
+// MAP PARSING FUNCTION
 export function parseCsvMap(mapName: "mapDesert_Ground" | "mapDesert_Objects") {
     const map = fs.readFileSync(`./server/src/assets/${mapName}.csv`, "utf8");
     const section = map.split("\n");
     section.pop();
     const map2D = section.map(s => s.split(",").map(n => {
         const id = parseInt(n);
-        return id >= 0 ? {id} : undefined;
+        return id >= 0 ? { id } : undefined;
     }));
     return map2D;
 }
 
- export const isSquareColiding = (sq1: SquareColisionParams, sq2: SquareColisionParams) => {
+// AID TO GAME LOGIC
+export const isSquareColiding = (sq1: SquareColisionParams, sq2: SquareColisionParams) => {
     if (sq1.x + sq1.width + sq2.width > sq2.x + sq2.width &&
         sq1.x <= sq2.x + sq2.width &&
         sq1.y + sq1.height + sq2.height >= sq2.y + sq2.height &&
@@ -88,7 +91,6 @@ export const isAttackColiding = (p1: PlayerType, p2: PlayerType) => {
 
 }
 
-const TILE_SIZE = 32;
 export const isColidingWithEnvironment = (map: MapType, player: SquareColisionParams) => {
     for (let row = 0; row < map.length; row++) {
         for (let col = 0, rl = map[0].length; col < rl; col++) {
@@ -110,7 +112,6 @@ export const isColidingWithEnvironment = (map: MapType, player: SquareColisionPa
 }
 
 type respawnCoordsType = (map: MapType) => { x: number, y: number };
-
 export const generateRespawnCoords: respawnCoordsType = (map: MapType) => {
     const x = Math.trunc(Math.random() * (map.length * TILE_SIZE - 96));
     const y = Math.trunc(Math.random() * (map.length * TILE_SIZE - 96));
@@ -120,6 +121,20 @@ export const generateRespawnCoords: respawnCoordsType = (map: MapType) => {
     else
         return generateRespawnCoords(map);
 }
+
+
+type spawnRandomBuffType = () => { x: number, y: number, buff: BuffKey };
+export const spawnRandomBuff: spawnRandomBuffType = () => {
+    const buffsList: BuffKey[] = Object.keys(BUFFS) as BuffKey[];
+    const randomBuff = buffsList[Math.floor(Math.random() * buffsList.length)];
+    const coords = generateRespawnCoords(OBSTACLES);
+
+    return {
+        x: coords.x,
+        y: coords.y,
+        buff: randomBuff,
+    };
+};
 
 
 // Function to recursively sum the values of two objects
@@ -152,39 +167,11 @@ export function merge<T extends Record<string, any>>(obj1: T, obj2: T, action: "
 }
 
 
-
-
-
-
-
-
-
-
-/*
-export async function parseMap(layer = 0) {
-    const map = await new Promise((resolve, reject) => {
-        tmx.parseFile("./src/assets/mapDesert.tmx", (err, map) => {
-            if (err)
-                return reject(map);
-            const tiles = map.layers[layer].tiles;
-            let parsedMap = [];
-            for (let row = 0; row < map.height; row++) {
-                let columns = [];
-                for (let col = 0; col < map.width; col++) {
-                    const t = tiles[row * 100 + col];
-                    if (t)
-                        columns.push({ id: t.id, gid: t.gid });
-                    else
-                        columns.push(undefined);
-                }
-                parsedMap.push(columns);
-            }
-
-            resolve(parsedMap);
-        });
-    });
-
-    return map;
-}
-*/
-
+export const UUIDGeneratorBrowser = (): string => {
+    //@ts-ignore
+  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).toString().replace(/[018]/g, (c) => {
+    const random = crypto.getRandomValues(new Uint8Array(1))[0];
+    const randomHex = random & (15 >> (c / 4));
+    return (c ^ randomHex).toString(16);
+  });
+};

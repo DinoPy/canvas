@@ -12,9 +12,9 @@ body {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-250px, -100px);
+    transform: translate(-250px, -200px);
     width: 500px;
-    height: 200px;
+    height: fit-content;
 
     background-color: rgba(0,0,0,0.75);
     border-radius: 1em;
@@ -29,8 +29,7 @@ body {
     color: white;
 }
 
-.playerName {
-    width: 90%;
+.inputs {
     height: 2em;
     border-radius: 5px;
     padding-left: 5px;
@@ -40,26 +39,63 @@ body {
     font-family: 'Rubik Doodle Shadow', sans-serif !important;
 }
 
-.playerName::placeholder {
+.playerName {
+    width: 90%;
+}
+
+.inputs::placeholder {
     color: white;
 }
 
+
 fieldset {
-    padding: 1em 2em;
+    padding: 1em 1.5em;
     border: white 2px solid;
     border-radius : 5px;
 }
 
-.submitBtn {
-    background-color: #252525;
+legend {
+    text-align: center;
+}
+
+.overlayBtn {
     font-family: 'Rubik Doodle Shadow', sans-serif !important;
+    background-color: #252525;
+    border: none;
+    color: #FEFEFE;
+}
+
+.submitBtn {
     font-size: 1.5rem;
     border-radius: 10px;
     padding: .4em 1.5em;
-    border: none;
     box-shadow: 0px 0px 5px red;
+}
 
-    color: #FEFEFE;
+.actionBtn {
+    border-radius: 5px;
+    padding: .4em 1.5em;
+}
+
+#gameRooms > input {
+    margin-right: 0.5em;
+}
+
+.newRoomAddBtn {
+    display: block;
+}
+
+.newRoomBox {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 0.5em;
+}
+
+.newRoomBtnBox {
+    display: flex;
+    justify-content: center;
+    margin: 0.6em 0;
 }
 
 .abilities-overlay {
@@ -106,6 +142,7 @@ fieldset {
 
 .hidden {
     visibility: hidden;
+    display: none;
 }
 
 .onCd {
