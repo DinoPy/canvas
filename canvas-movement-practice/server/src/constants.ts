@@ -1,5 +1,5 @@
 import { parseCsvMap } from "./utility";
-import { MapType, BuffType, BuffKey } from "./types";
+import { MapType, BuffType, BuffKey, ElementTypes, DirectionTypes, HitboxTypes, AbilitiesType, AbilityProps } from "./types";
 
 export const MAP: MapType = parseCsvMap("mapDesert_Ground");
 export const OBSTACLES: MapType = parseCsvMap("mapDesert_Objects");
@@ -31,4 +31,87 @@ export const BUFFS: BuffType<BuffKey> = {
     minorDevastation: { crit: { physicalDamage: 0.1, magicDamage: 0.1 }, duration: 30, name: "Minor Devastation", tier: 1 },
     mediumDevastation: { crit: { physicalDamage: 0.2, magicDamage: 0.2 }, duration: 22, name: "Medium Devastation", tier: 2 },
     majorDevastation: { crit: { physicalDamage: 0.3, magicDamage: 0.3 }, duration: 15, name: "Major Devastation", tier: 3 },
+}
+
+export const ABILITIES: { [key in AbilitiesType]: AbilityProps } = {
+    melee1: {
+        multiplier: 1,
+        element: "none",
+        type: "physical",
+        isMelee: true,
+        hitbox: {
+            up: { pOffsetX: 10, pOffsetY: 0, width: 75, height: 30, },
+            down: { pOffsetX: 10, pOffsetY: 65, width: 75, height: 30, },
+            right: { pOffsetX: 48, pOffsetY: 15, width: 35, height: 70, },
+            left: { pOffsetX: 0, pOffsetY: 10, width: 35, height: 70, },
+        },
+        cooldown: Math.trunc((1000 / TICK_RATE) * 15 * 2), // time per frame * number of frames * animatin stutter.
+        duration: Math.trunc((1000 / TICK_RATE) * 15 * 2),
+        velocity: 0,
+        applyBuff: null,
+    },
+    movement1: {
+        multiplier: 0,
+        element: "none",
+        type: "utility",
+        isMelee: false,
+        hitbox: {
+            up: { pOffsetX: 0, pOffsetY: 0, width: 0, height: 0, },
+            down: { pOffsetX: 0, pOffsetY: 0, width: 0, height: 0, },
+            right: { pOffsetX: 0, pOffsetY: 0, width: 0, height: 0, },
+            left: { pOffsetX: 0, pOffsetY: 0, width: 0, height: 0, },
+        },
+        cooldown: 2500,
+        duration: 300,
+        velocity: 0,
+        applyBuff: null,
+    },
+    range1: {
+        multiplier: 0.6,
+        element: "none",
+        type: "physical",
+        isMelee: false,
+        hitbox: {
+            up: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
+            down: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
+            right: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
+            left: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
+        },
+        cooldown: 1000,
+        duration: 1000,
+        velocity: 25,
+        applyBuff: null,
+    },
+    range2: {
+        multiplier: 0.7,
+        element: "water",
+        type: "magic",
+        isMelee: false,
+        hitbox: {
+            up: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            down: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            right: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            left: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+        },
+        cooldown: 5000,
+        duration: 2000,
+        velocity: 15,
+        applyBuff: "slow",
+    },
+    range3: {
+        multiplier: 1.3,
+        element: "ice",
+        type: "magic",
+        isMelee: false,
+        hitbox: {
+            up: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            down: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            right: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            left: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+        },
+        cooldown: 5000,
+        duration: 2000,
+        velocity: 35,
+        applyBuff: "freeze",
+    }
 }

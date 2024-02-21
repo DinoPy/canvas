@@ -6,8 +6,8 @@ const playersEl = document.getElementById("playersOverlay") as HTMLDivElement;
 const gameRoomsContainer = document.getElementById("gameRooms") as HTMLDivElement;
 
 export const keyboardMaps: KeyboardMapsType = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
+    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
 }
 
 export class ElHandler<T extends HTMLElement> {
@@ -40,8 +40,6 @@ export class ElHandler<T extends HTMLElement> {
 
 }
 
-type skillsTypes = "dash" | "melee" | "range";
-
 export class GameUiHandler {
     cx: CanvasRenderingContext2D;
     skillSlotsEls: skillElementsType | {};
@@ -52,18 +50,18 @@ export class GameUiHandler {
         this.cx = cx;
     }
 
-    appendGameRoom (name: string, id: string, maxPlayers: number, onlinePlayers: number, i:number) {
-            let labelEl = document.createElement("label")
-            labelEl.htmlFor = id;
-            labelEl.textContent = `${name} - ${onlinePlayers}/${maxPlayers}`;
-            let radioInput = document.createElement("input");
-            radioInput.name = "gameRooms";
-            radioInput.value = id;
-            radioInput.type = "radio";
-            if (i === 0)
-                radioInput.checked = true;
-            gameRoomsContainer.append(labelEl);
-            gameRoomsContainer.append(radioInput);
+    appendGameRoom(name: string, id: string, maxPlayers: number, onlinePlayers: number, i: number) {
+        let labelEl = document.createElement("label")
+        labelEl.htmlFor = id;
+        labelEl.textContent = `${name} - ${onlinePlayers}/${maxPlayers}`;
+        let radioInput = document.createElement("input");
+        radioInput.name = "gameRooms";
+        radioInput.value = id;
+        radioInput.type = "radio";
+        if (i === 0)
+            radioInput.checked = true;
+        gameRoomsContainer.append(labelEl);
+        gameRoomsContainer.append(radioInput);
     }
 
     showGameRooms(gameRooms: GameRoomsType[]) {
@@ -84,9 +82,11 @@ export class GameUiHandler {
 
     setUpSkillSlotKeys(layout: keyof KeyboardMapsType) {
         if (!isNonEmptyObj<skillElementsType>(this.skillSlotsEls)) return;
-        this.skillSlotsEls["dash"]["key"].updateTextContents(keyboardMaps[layout].dash.toUpperCase())
-        this.skillSlotsEls["melee"]["key"].updateTextContents(keyboardMaps[layout].melee.toUpperCase())
-        this.skillSlotsEls["range"]["key"].updateTextContents(keyboardMaps[layout].range.toUpperCase())
+        const skillSlotsKeys = Object.keys(this.skillSlotsEls);
+        for (let i = 0; i < skillSlotsKeys.length; i++) {
+            const currentKey = skillSlotsKeys[i] as SkillsListType;
+            this.skillSlotsEls[currentKey]["key"].updateTextContents(keyboardMaps[layout][currentKey].toUpperCase())
+        }
     }
 
     appendSkillEls(name: string, obj: { slot: ElHandler<HTMLDivElement>, img: ElHandler<HTMLImageElement>, dmg: ElHandler<HTMLSpanElement>, key: ElHandler<HTMLSpanElement> }) {
@@ -101,7 +101,7 @@ export class GameUiHandler {
         const dmgNumEl = new ElHandler<HTMLSpanElement>("span", "cd-num", "0");
         dmgNumEl.addClass("hidden");
         dmgNumEl.appendSelf(slotEl.returnSelf());
-        const keyEl = new ElHandler<HTMLSpanElement>("span", "key-text", "w")
+        const keyEl = new ElHandler<HTMLSpanElement>("span", "key-text", "")
         keyEl.appendSelf(slotEl.returnSelf());
 
         this.appendSkillEls(index, {
@@ -218,7 +218,7 @@ export class GameUiHandler {
 }
 
 type LayoutType = {
-    up: string; down: string; left: string; right: string; dash: string; melee: string; range: string;
+    up: string; down: string; left: string; right: string; dash: string; melee1: string; range1: string; range2: string; range3: string;
 };
 
 type KeyboardMapsType = {
@@ -226,10 +226,10 @@ type KeyboardMapsType = {
     "colemak-dh": LayoutType;
 }
 
-type SkillsListType = "melee" | "range" | "dash";
+type SkillsListType = "melee1" | "range1" | "dash" | "range2";
 
 export type skillElementsType = {
-    [key in skillsTypes]: {
+    [key in SkillsListType]: {
         slot: ElHandler<HTMLDivElement>;
         img: ElHandler<HTMLImageElement>;
         dmg: ElHandler<HTMLSpanElement>;

@@ -28,6 +28,7 @@ export const isSquareColiding = (sq1: SquareColisionParams, sq2: SquareColisionP
 export const isAttackColiding = (p1: PlayerType, p2: PlayerType) => {
     // we need 4 ifs for all directions.
     if (p1.direction === "right") {
+        // on each check for collision we use P1 as first argument.
         return isSquareColiding(
             {
                 x: p1.x + p1.width / 2,
@@ -151,7 +152,7 @@ export function sumPlayerStats(obj1: PlayerStats, obj2: PlayerStats, action: "ap
 }
 
 // Helper function to sum values of two nested objects
-export function merge<T extends Record<string, any>>(obj1: T, obj2: T, action: "apply" | "remove"): T {
+export function merge<T extends Record<string, any>>(obj1: T, obj2: T, action: "apply" | "remove" = "apply"): T {
     const result: Partial<T> = {};
     for (const key in obj1) {
         if (typeof obj1[key] === 'object' && typeof obj2[key] === 'object') {
@@ -169,9 +170,9 @@ export function merge<T extends Record<string, any>>(obj1: T, obj2: T, action: "
 
 export const UUIDGeneratorBrowser = (): string => {
     //@ts-ignore
-  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).toString().replace(/[018]/g, (c) => {
-    const random = crypto.getRandomValues(new Uint8Array(1))[0];
-    const randomHex = random & (15 >> (c / 4));
-    return (c ^ randomHex).toString(16);
-  });
+    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).toString().replace(/[018]/g, (c) => {
+        const random = crypto.getRandomValues(new Uint8Array(1))[0];
+        const randomHex = random & (15 >> (c / 4));
+        return (c ^ randomHex).toString(16);
+    });
 };

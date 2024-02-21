@@ -3,8 +3,8 @@ const abilitiesEl = document.getElementById("abilitiesEl");
 const playersEl = document.getElementById("playersOverlay");
 const gameRoomsContainer = document.getElementById("gameRooms");
 export const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee: "Space", range: "Lb" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee: "Space", range: "Lb" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
+    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
 };
 export class ElHandler {
     type;
@@ -66,9 +66,11 @@ export class GameUiHandler {
     setUpSkillSlotKeys(layout) {
         if (!isNonEmptyObj(this.skillSlotsEls))
             return;
-        this.skillSlotsEls["dash"]["key"].updateTextContents(keyboardMaps[layout].dash.toUpperCase());
-        this.skillSlotsEls["melee"]["key"].updateTextContents(keyboardMaps[layout].melee.toUpperCase());
-        this.skillSlotsEls["range"]["key"].updateTextContents(keyboardMaps[layout].range.toUpperCase());
+        const skillSlotsKeys = Object.keys(this.skillSlotsEls);
+        for (let i = 0; i < skillSlotsKeys.length; i++) {
+            const currentKey = skillSlotsKeys[i];
+            this.skillSlotsEls[currentKey]["key"].updateTextContents(keyboardMaps[layout][currentKey].toUpperCase());
+        }
     }
     appendSkillEls(name, obj) {
         this.skillSlotsEls = Object.assign(this.skillSlotsEls, { [name]: obj });
@@ -81,7 +83,7 @@ export class GameUiHandler {
         const dmgNumEl = new ElHandler("span", "cd-num", "0");
         dmgNumEl.addClass("hidden");
         dmgNumEl.appendSelf(slotEl.returnSelf());
-        const keyEl = new ElHandler("span", "key-text", "w");
+        const keyEl = new ElHandler("span", "key-text", "");
         keyEl.appendSelf(slotEl.returnSelf());
         this.appendSkillEls(index, {
             slot: slotEl,

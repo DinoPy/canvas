@@ -4,9 +4,9 @@ import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 
-import { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData, PlayerStats, BuffKey, keyControlsType, BuffList, PlayerType, ProjectileType, BuffObjectType, GameType } from "./types.ts";
-import { MAP, OBSTACLES, TICK_RATE, TILE_SIZE, BUFFS } from "./constants.ts";
-import { isAttackColiding, isSquareColiding, isColidingWithEnvironment, generateRespawnCoords, spawnRandomBuff, UUIDGeneratorBrowser } from "./utility.ts";
+import { ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData, PlayerStats, BuffKey, keyControlsType, BuffList, PlayerType, ProjectileType, BuffObjectType, GameType, AbilityProps, AbilitiesType } from "./types.ts";
+import { MAP, OBSTACLES, TICK_RATE, TILE_SIZE, BUFFS, ABILITIES } from "./constants.ts";
+import { isAttackColiding, isSquareColiding, isColidingWithEnvironment, generateRespawnCoords, spawnRandomBuff, UUIDGeneratorBrowser, merge } from "./utility.ts";
 
 const app: Express = express();
 const httpServer = createServer(app);
@@ -46,7 +46,7 @@ class Game implements GameType {
         this.id = roomObj.id;
         this.password = roomObj.password;
         this.gameConfig = { maxPlayers: roomObj.maxPlayers };
-        this.pickableBuffConfig = { respawnTime: 7000, maxNumber: 3 };
+        this.pickableBuffConfig = { respawnTime: 10000, maxNumber: 3 };
         this.players = {};
         this.projectiles = [];
         this.pickableBuffs = [];
@@ -58,7 +58,7 @@ class Game implements GameType {
             const newPickableBuff = spawnRandomBuff();
             const currentBuff = BUFFS[newPickableBuff.buff];
             this.pickableBuffs.push(new Buff(newPickableBuff.x, newPickableBuff.y, newPickableBuff.buff, currentBuff.duration, currentBuff.name, currentBuff.tier, this.id));
-        }, 2000);
+        }, this.pickableBuffConfig.respawnTime);
 
         // The game room will erase itself if not played for more than ~10 minutes
         // This interval exists x number of rooms, not good.
@@ -73,16 +73,17 @@ class Game implements GameType {
             for (let pl in this.players) {
                 this.players[pl].checkState();
                 this.players[pl].move();
-                this.players[pl].attackCheckHit();
+                //this.players[pl].attackCheckHit();
                 this.players[pl].updateDashStatus();
                 this.players[pl].triggerRegen();
                 this.players[pl].updateBuffs();
                 this.players[pl].checkColisionWithBuff();
+                this.players[pl].decreaseCooldown(delta);
             }
 
             for (let i in this.projectiles) {
                 this.projectiles[i].move(delta);
-                this.projectiles[i].checkHit();
+                this.projectiles[i].isAttackConnecting();
             }
             this.projectiles = this.projectiles.filter((proj: Projectile) => {
                 let isAlive = proj.life > 0;
@@ -107,7 +108,6 @@ class Player implements PlayerType {
     width: number; hbWidth: number;
     height: number; hbHeight: number;
     keyControls: keyControlsType;
-    score: number;
     isAttacking: boolean;
     state: "idle" | "attack" | "run";
     direction: "down" | "up" | "left" | "right";
@@ -117,6 +117,7 @@ class Player implements PlayerType {
     playerStats: PlayerStats;
     playerBuffStats: PlayerStats;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+    abilities: { [key in AbilitiesType]: number }
 
     constructor(id: string, x: number, y: number, name: string, avatarIndex: number, roomId: string) {
         this.id = id;
@@ -133,7 +134,6 @@ class Player implements PlayerType {
             left: false,
             right: false
         }
-        this.score = 0;
         this.isAttacking = false;
         this.state = "idle";
         this.direction = "down";
@@ -146,76 +146,23 @@ class Player implements PlayerType {
         };
         this.attack1_alreadyHit = [];
         this.playerStats = {
-            regen: {
-                lastRegen: +new Date,
-                amount: 1,
-                multiplier: 1,
-                interval: 1000,
-            },
-            life: {
-                max: 100,
-                multiplier: 1.5,
-                current: 100,
-            },
-            crit: {
-                physicalRate: 0.15,
-                physicalDamage: 0.5,
-                magicRate: 0.15,
-                magicDamage: 0.5,
-            },
-            attack: {
-                physical: 35,
-                physicalMultiplier: 1,
-                magic: 30,
-                magicMultiplier: 1,
-            },
-            armor: {
-                magic: 10,
-                magicMultiplier: 1,
-                physical: 10,
-                physicalMultiplier: 1,
-            },
-            movement: {
-                speed: 8,
-                multiplier: 1,
-            },
+            regen: { lastRegen: +new Date, amount: 1, multiplier: 1, interval: 1000, },
+            life: { max: 100, multiplier: 1.5, current: 100, },
+            crit: { physicalRate: 0.15, physicalDamage: 0.5, magicRate: 0.15, magicDamage: 0.5, },
+            attack: { physical: 35, physicalMultiplier: 1, magic: 30, magicMultiplier: 1, },
+            armor: { magic: 10, magicMultiplier: 1, physical: 10, physicalMultiplier: 1, },
+            movement: { speed: 8, multiplier: 1, },
         };
         this.playerBuffStats = {
-            regen: {
-                lastRegen: 0,
-                amount: 0,
-                multiplier: 0,
-                interval: 0,
-            },
-            life: {
-                current: 0,
-                max: 0,
-                multiplier: 0,
-            },
-            crit: {
-                physicalRate: 0,
-                physicalDamage: 0,
-                magicRate: 0,
-                magicDamage: 0,
-            },
-            attack: {
-                physical: 0,
-                physicalMultiplier: 0,
-                magic: 0,
-                magicMultiplier: 0,
-            },
-            armor: {
-                magic: 0,
-                magicMultiplier: 0,
-                physical: 0,
-                physicalMultiplier: 0,
-            },
-            movement: {
-                speed: 0,
-                multiplier: 0,
-            },
+            regen: { lastRegen: 0, amount: 0, multiplier: 0, interval: 0, },
+            life: { current: 0, max: 0, multiplier: 0, },
+            crit: { physicalRate: 0, physicalDamage: 0, magicRate: 0, magicDamage: 0, },
+            attack: { physical: 0, physicalMultiplier: 0, magic: 0, magicMultiplier: 0, },
+            armor: { magic: 0, magicMultiplier: 0, physical: 0, physicalMultiplier: 0, },
+            movement: { speed: 0, multiplier: 0, },
         }
         this.buffs = {};
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0};
     }
 
     checkState() {
@@ -255,6 +202,7 @@ class Player implements PlayerType {
 
     }
 
+    /*
     attackCheckHit() {
         for (let p in games[this.roomId].players)
             if (p !== this.id) {
@@ -277,6 +225,7 @@ class Player implements PlayerType {
                 }
             }
     }
+    */
 
     updateDashStatus() {
         if (this.dash.isDashing && this.dash.dashStart !== null) {
@@ -328,52 +277,82 @@ class Player implements PlayerType {
         }
     }
 
+    decreaseCooldown(delta:number) {
+        for (let abil  in this.abilities) {
+            let a: AbilitiesType = abil as AbilitiesType;
+            if (this.abilities[a] > 0)
+                this.abilities[a] = Math.max(this.abilities[a] -= delta, 0);
+        }
+    }
+
     static calculateDamage(dealer: Player, receiver: Player, type: "physical" | "magic", attackMultiplier: number) {
         const offenderCurrentCrit: number = dealer.playerStats.crit.physicalRate + dealer.playerBuffStats.crit.physicalRate;
+
         const isCrit: boolean = Math.random() < offenderCurrentCrit;
+
         let damage: number = Math.trunc((dealer.playerStats.attack.physical * (dealer.playerStats.attack.physicalMultiplier + dealer.playerBuffStats.attack.physicalMultiplier) + dealer.playerBuffStats.attack.physical) * attackMultiplier);
+
         if (isCrit) {
             const offenderCurrentCritDamage = dealer.playerStats.crit.physicalDamage + dealer.playerBuffStats.crit.physicalDamage;
             damage = Math.trunc(damage + (damage * offenderCurrentCritDamage));
         }
 
-        const receiverArmor = receiver.playerStats.armor[type] * (receiver.playerStats.armor[`${type}Multiplier`] +
-            receiver.playerBuffStats.armor[`${type}Multiplier`]) + receiver.playerBuffStats.armor[type]
+        const receiverArmor = receiver.playerStats.armor[type] *
+            (receiver.playerStats.armor[`${type}Multiplier`] +
+                receiver.playerBuffStats.armor[`${type}Multiplier`]) +
+            receiver.playerBuffStats.armor[type]
         damage = Math.trunc(damage - receiverArmor);
         return { damage, isCrit };
     }
 }
 
+// the projectile type will actually become attack type
+// every attack will create a game object of its own that will handle
+// movement and collision as well as applying damage.
 class Projectile implements ProjectileType {
+    name: AbilitiesType;
     x: number; width: number;
     y: number; height: number;
     angle: number;
     ownerId: string;
     roomId: string;
     life: number;
-    score: number;
     velocity: number;
-    constructor(x: number, y: number, angle: number, ownerId: string, roomId: string) {
+    abilityProps: AbilityProps;
+    enemiesHit: string[];
+
+    constructor(name: AbilitiesType, x: number, y: number, angle: number, ownerId: string, roomId: string, abilityProps: AbilityProps) {
+        this.name = name;
         this.x = x; this.width = 16;
         this.y = y; this.height = 11;
         this.angle = angle;
         this.ownerId = ownerId;
         this.roomId = roomId;
-        this.life = 1000;
-        this.score = 0;
-        this.velocity = 30;
+        this.life = abilityProps.duration;
+        this.velocity = abilityProps.velocity;
+        this.abilityProps = abilityProps;
+        this.enemiesHit = [];
     }
 
     move(delta: number) {
+        this.life -= delta;
+        if (this.abilityProps.isMelee || this.abilityProps.type === "utility") return;
         this.x += Math.cos(this.angle) * this.velocity;
         this.y += Math.sin(this.angle) * this.velocity;
-        this.life -= delta;
 
         if (isColidingWithEnvironment(OBSTACLES, { x: this.x, y: this.y, width: 16, height: 11 }))
             this.life = 0;
     }
 
-    checkHit() {
+    isAttackConnecting() {
+        if (this.abilityProps.isMelee)
+            this.checkMeleeHit()
+        else
+            this.checkRangeHit();
+    }
+
+    checkRangeHit() {
+        if (this.abilityProps.type === "utility") return;
         const playerList = games[this.roomId].players;
         for (let p in playerList)
             if (p !== this.ownerId) {
@@ -384,15 +363,26 @@ class Projectile implements ProjectileType {
                         width: playerList[p].hbWidth,
                         height: playerList[p].hbHeight
                     },
-                    { x: this.x, y: this.y, width: this.width, height: this.height },
+                    {
+                        x: this.x,
+                        y: this.y,
+                        width: this.abilityProps.hitbox.up.width,
+                        height: this.abilityProps.hitbox.up.height
+                    },
                 )) {
                     if (!playerList[p].dash.isDashing) {
-                        const dmgDetails = Player.calculateDamage(playerList[this.ownerId], playerList[p], "physical", 0.6);
+                        const dmgDetails = Player.calculateDamage(
+                            playerList[this.ownerId],
+                            playerList[p],
+                            this.abilityProps.type,
+                            this.abilityProps.multiplier
+                        );
                         playerList[p].playerStats.life.current -= dmgDetails.damage;
                         io.to(p).emit("damageTaken", dmgDetails);
                         io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
                     }
                     this.life = 0;
+                    games[this.roomId].players[this.ownerId].abilities[this.name] = 0;
                 }
 
                 if (playerList[p].playerStats.life.current <= 0) {
@@ -400,6 +390,30 @@ class Projectile implements ProjectileType {
                     playerList[p].x = coords.x;
                     playerList[p].y = coords.y;
                     playerList[p].playerStats.life.current = 100;
+                }
+            }
+    }
+
+    checkMeleeHit() {
+        if (this.abilityProps.type === "utility") return;
+        for (let p in games[this.roomId].players)
+            if (p !== this.ownerId) {
+                if (!this.enemiesHit.includes(p)) {
+                    const playerList = games[this.roomId].players;
+                    if (isAttackColiding(playerList[this.ownerId], playerList[p]) && !playerList[p].dash.isDashing) {
+                        this.enemiesHit.push(p);
+                        const dmgDetails = Player.calculateDamage(playerList[this.ownerId], playerList[p], this.abilityProps.type, this.abilityProps.multiplier);
+                        playerList[p].playerStats.life.current -= dmgDetails.damage;
+                        io.to(p).emit("damageTaken", dmgDetails);
+                        io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
+                    }
+
+                    if (playerList[p].playerStats.life.current <= 0) {
+                        const coords = generateRespawnCoords(OBSTACLES);
+                        playerList[p].x = coords.x;
+                        playerList[p].y = coords.y;
+                        playerList[p].playerStats.life.current = playerList[p].playerStats.life.max;
+                    }
                 }
             }
     }
@@ -526,7 +540,7 @@ async function main() {
                 });
             }
             if (games[id].password === config.password) {
-                if ( Object.keys(games[id].players).length >= games[id].gameConfig.maxPlayers) return;
+                if (Object.keys(games[id].players).length >= games[id].gameConfig.maxPlayers) return;
                 const coords = generateRespawnCoords(OBSTACLES);
                 games[id].players[socket.id] = new Player(
                     socket.id,
@@ -558,11 +572,13 @@ async function main() {
                 player.projectileCount++;
                 games[socket.data.roomId].projectiles.push(
                     new Projectile(
+                        projectile.name,
                         projectile.x,
                         projectile.y,
                         projectile.angle,
                         socket.id,
                         socket.data.roomId,
+                        ABILITIES["range1"],
                     ));
             }
         });
@@ -584,6 +600,30 @@ async function main() {
             player.isAttacking = false;
             player.state = state;
             player.attack1_alreadyHit = [];
+        });
+
+        socket.on("attack", (data) => {
+            const currentGame = games[socket.data.roomId];
+            const player = currentGame.players[socket.id];
+            console.log(player.abilities);
+            if (player.abilities[data.name] > 0) return;
+            currentGame.projectiles.push(
+                new Projectile(
+                    data.name,
+                    data.x,
+                    data.y,
+                    data.angle,
+                    socket.id,
+                    socket.data.roomId,
+                    ABILITIES[data.name],
+                ));
+
+            player.abilities[data.name] = ABILITIES[data.name].cooldown;
+
+            if (data.name === "melee1") {
+                player.isAttacking = true;
+                player.state = "attack";
+            }
         });
 
         socket.on("disconnect", () => {

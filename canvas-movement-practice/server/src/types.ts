@@ -6,21 +6,22 @@ export interface ServerToClientEvents {
     damageDealt: (dmgDetails: { to: string; damage: number; isCrit: boolean }) => void;
     playerBuffCollision: (data: { name: string; buff: { name: string, tier: number } }) => void;
     playerBuffExpire: (data: { name: string, buffName: string }) => void;
-    theRoomWasCreated: (gameConfig: { name: string; id: string, number: number, maxPlayers: number, onlinePlayers: number}) => void;
+    theRoomWasCreated: (gameConfig: { name: string; id: string, number: number, maxPlayers: number, onlinePlayers: number }) => void;
     failedToValidateRoomPw: () => void;
     playerJoinedRoom: () => void;
 
 }
 
 export interface ClientToServerEvents {
-    createRoom: (data: { name: string, password: string, maxPlayers:number }) => void;
-    joinRoom: (config: { roomId: string, playerName: string, avatarIndex: number, password: string}) => void;
+    createRoom: (data: { name: string, password: string, maxPlayers: number }) => void;
+    joinRoom: (config: { roomId: string, playerName: string, avatarIndex: number, password: string }) => void;
     userReady: (data: { name: string; avatarIndex: number }) => void;
     playerMovement: (controls: keyControlsType) => void;
     shoot: (bullet: emitProjectileArgType) => void;
     dash: () => void;
     attackMelee1: () => void;
     stopAttacking: (state: "idle" | "run" | "attack") => void;
+    attack: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
 }
 
 export interface InterServerEvents {
@@ -57,7 +58,6 @@ export interface PlayerType {
     width: number; hbWidth: number;
     height: number; hbHeight: number;
     keyControls: keyControlsType;
-    score: number;
     isAttacking: boolean;
     state: "idle" | "attack" | "run";
     direction: "down" | "up" | "left" | "right";
@@ -67,16 +67,20 @@ export interface PlayerType {
     playerStats: PlayerStats;
     playerBuffStats: PlayerStats;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+    abilities: { [key in AbilitiesType]: number }
 }
 
 export interface ProjectileType {
+    name: AbilitiesType;
     x: number; width: number;
     y: number; height: number;
     angle: number;
     ownerId: string;
     roomId: string;
     life: number;
-    score: number;
+    velocity: number;
+    abilityProps: AbilityProps;
+    enemiesHit: string[];
 }
 
 export interface BuffObjectType {
@@ -122,6 +126,28 @@ export type MapType = ({ id: number } | undefined)[][];
 
 export type keyControlsType = { up: boolean, down: boolean, left: boolean, right: boolean };
 
-export type emitProjectileArgType = { angle: number; x: number; y: number };
+export type emitProjectileArgType = { name: AbilitiesType; angle: number; x: number; y: number };
 
 export interface SquareColisionParams { x: number; y: number; width: number; height: number }
+
+
+export type ElementTypes = "none" | "water" | "fire" | "ice";
+export type DirectionTypes = "up" | "down" | "left" | "right";
+export interface HitboxTypes {
+    pOffsetX: number;
+    pOffsetY: number;
+    width: number;
+    height: number;
+}
+export interface AbilityProps {
+    multiplier: number;
+    element: ElementTypes,
+    type: "physical" | "magic" | "utility",
+    isMelee: boolean;
+    hitbox: { [key in DirectionTypes]: HitboxTypes },
+    cooldown: number;
+    duration: number;
+    velocity: number;
+    applyBuff: string | null;
+}
+export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3";
