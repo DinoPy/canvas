@@ -150,4 +150,4 @@ export interface AbilityProps {
     velocity: number;
     applyBuff: string | null;
 }
-export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3";
+export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3" | "melee2";

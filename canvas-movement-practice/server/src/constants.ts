@@ -77,7 +77,7 @@ export const ABILITIES: { [key in AbilitiesType]: AbilityProps } = {
             right: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
             left: { pOffsetX: 0, pOffsetY: 0, width: 16, height: 11, },
         },
-        cooldown: 1000,
+        cooldown: 600,
         duration: 1000,
         velocity: 25,
         applyBuff: null,
@@ -88,7 +88,7 @@ export const ABILITIES: { [key in AbilitiesType]: AbilityProps } = {
         type: "magic",
         isMelee: false,
         hitbox: {
-            up: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
+            up: { pOffsetX: 0, pOffsetY: 0, width: 50, height: 65, },
             down: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
             right: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
             left: { pOffsetX: 0, pOffsetY: 0, width: 25, height: 25, },
@@ -113,5 +113,21 @@ export const ABILITIES: { [key in AbilitiesType]: AbilityProps } = {
         duration: 2000,
         velocity: 35,
         applyBuff: "freeze",
-    }
+    },
+    melee2: {
+        multiplier: 1,
+        element: "none",
+        type: "physical",
+        isMelee: true,
+        hitbox: {
+            up: { pOffsetX: 10, pOffsetY: 0, width: 75, height: 30, },
+            down: { pOffsetX: 10, pOffsetY: 65, width: 75, height: 30, },
+            right: { pOffsetX: 48, pOffsetY: 15, width: 35, height: 70, },
+            left: { pOffsetX: 0, pOffsetY: 10, width: 35, height: 70, },
+        },
+        cooldown: Math.trunc((1000 / TICK_RATE) * 15 * 2), // time per frame * number of frames * animatin stutter.
+        duration: Math.trunc((1000 / TICK_RATE) * 15 * 2),
+        velocity: 0,
+        applyBuff: null,
+    },
 }

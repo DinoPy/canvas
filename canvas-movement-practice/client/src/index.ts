@@ -26,6 +26,7 @@ uiHandler.setUpSkill("range1", "./assets/rangeIcon.png");
 uiHandler.setUpSkill("movement1", "./assets/dashIcon.png");
 uiHandler.setUpSkill("range2", "./assets/rangeIcon.png");
 uiHandler.setUpSkill("range3", "./assets/rangeIcon.png");
+uiHandler.setUpSkill("melee2", "./assets/attackIcon.png");
 const els = uiHandler.returnSkillSlots() as skillElementsType;
 
 const overlayEl: HTMLDivElement = document.getElementById("overlay") as HTMLDivElement;
@@ -92,6 +93,7 @@ let isAbilityPressed = {
     movement1: false,
     range2: false,
     range3: false,
+    melee2: false,
 }
 window.addEventListener('keydown', (e) => {
     if ((e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") && !keyControls.up) {
@@ -124,6 +126,9 @@ window.addEventListener('keydown', (e) => {
     if (e.key === keyboardMaps[playerLayout].range3 && !isAbilityPressed.range3) {
         isAbilityPressed.range3 = true;
     }
+    if (e.key === keyboardMaps[playerLayout].melee2 && !isAbilityPressed.melee2) {
+        isAbilityPressed.melee2 = true;
+    }
 })
 window.addEventListener('keyup', (e) => {
     if (e.key === keyboardMaps[playerLayout].up || e.key === "ArrowUp") keyControls.up = false;
@@ -136,7 +141,7 @@ window.addEventListener('keyup', (e) => {
 
 })
 window.addEventListener('click', (e) => {
-    if (ISREADY) mouseControls.down = true;
+    if (ISREADY) isAbilityPressed.range1 = true;
 });
 
 let lastMouseMoveTime = 0;
@@ -194,15 +199,15 @@ images.strengthening.src = "./assets/icons/strengthening.png";
 images.swiftness.src = "./assets/icons/swiftness.png";
 images.warding.src = "./assets/icons/warding.png";
 
-export type AnimOptionsType = "darkPoison" | "range3" | "flame1" | "flame2" | "range2" | "range1";
+export type AnimOptionsType = "darkPoison" | "range3" | "melee2" | "melee3" | "range2" | "range1";
 export type AnimListType = { [key in AnimOptionsType]: Animation }
 const animations: AnimListType = {
     darkPoison: new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64),
     range1: new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25),
-    range2: new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50),
+    range2: new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 150, 100),
     range3: new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32),
-    flame1: new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600),
-    flame2: new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220),
+    melee3: new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600),
+    melee2: new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220),
 }
 class Player implements PlayerType {
     id: string;
@@ -240,7 +245,7 @@ class Player implements PlayerType {
         this.bulletCount = 0;
         this.animations = animations;
         this.buffs = {};
-        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0 };
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0, "melee2": 0 };
     }
 
     draw(camX: number, camY: number, gf: number) {
@@ -256,7 +261,6 @@ class Player implements PlayerType {
         }
 
         if (this.isAttacking && this.animations[this.cls + this.state].hasFrameEnded()) {
-            els["melee1"]["slot"].removeClass("onCd");
             if (ISREADY) socket.emit("stopAttacking", this.state);
             this.isAttacking = false;
             if (keyControls.up || keyControls.down || keyControls.left || keyControls.right) this.state = "run";
@@ -305,9 +309,12 @@ class Player implements PlayerType {
             if (this.id === primaryPlayerId)
                 socket.emit("ability", data);
         }
+
+        /*
         cx.fillStyle = "rgba(0,0,0,0.2)";
         cx.fillStyle = "lime";
         cx.fillRect(this.x - (camX || 0) + 0, this.y - (camY || 0) + 10, 35, 70);
+        */
 
     }
 
@@ -325,18 +332,16 @@ class Player implements PlayerType {
             x: this.x + this.width / 2,
             y: this.y + this.height / 2,
         }
-        //socket.emit("shoot", data);
+
         socket.emit("ability", data);
-        mouseControls.down = false;
-        isAbilityPressed.range2 = false;
-        isAbilityPressed.range3 = false;
+        isAbilityPressed[name] = false;
 
     }
 
     checkDashing() {
         if (this.id === primaryPlayerId && keyControls.movement1 && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
-            socket.emit("ability", {angle: 0, x: 0, y: 0, name: "movement1"});
+            socket.emit("ability", { angle: 0, x: 0, y: 0, name: "movement1" });
 
             keyControls.movement1 = false;
             this.dash.dashStart = +new Date;
@@ -395,15 +400,11 @@ class Player implements PlayerType {
     }
 
     update(camX: number, camY: number, offsets: CoordsOffsetsType, id: string, gameFrame: number) {
-        if (mouseControls.down) {
-            this.shot(offsets, "range1");
-        }
-        if (isAbilityPressed.range2) {
-            this.shot(offsets, "range2");
-        }
-        if (isAbilityPressed.range3) {
-            this.shot(offsets, "range3");
-        }
+        if (isAbilityPressed.range1) this.shot(offsets, "range1");
+        if (isAbilityPressed.range2) this.shot(offsets, "range2");
+        if (isAbilityPressed.range3) this.shot(offsets, "range3");
+        if (isAbilityPressed.melee2) this.shot(offsets, "melee2");
+
 
         this.draw(camX, camY, gameFrame);
         this.showStats(id, camX, camY);
@@ -628,7 +629,7 @@ const animate = () => {
         }
     }
     for (let b of bullets) {
-        if (b.name === "range1" || b.name === "range2" || b.name === "range3")
+        if (b.name === "range1" || b.name === "range2" || b.name === "range3" || b.name === "melee2")
             animations[b.name].drawRotated(b.x - cameraX, b.y - cameraY, gameFrame, b.angle);
 
     }
@@ -655,10 +656,10 @@ const animate = () => {
     }
 
 
-    animations.flame2.drawImage(500 - cameraX, 300 - cameraY, gameFrame);
+    animations.melee2.drawImage(500 - cameraX, 300 - cameraY, gameFrame);
     animations.range3.drawRotated(400 - cameraX, 400 - cameraY, gameFrame, angle);
     animations.darkPoison.drawImage(500 - cameraX, 500 - cameraY, gameFrame)
-    animations.flame1.drawRotated(400 - cameraX, 300 - cameraY, gameFrame, angle);
+    animations.melee3.drawRotated(400 - cameraX, 300 - cameraY, gameFrame, angle);
 
     gameFrame++;
     requestAnimationFrame(animate);
@@ -724,7 +725,7 @@ export interface ClientToServerEvents {
     ability: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
 }
 
-export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3";
+export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3" | "melee2";
 
 export interface InterServerEvents {
     ping: () => void;

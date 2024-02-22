@@ -3,8 +3,30 @@ const abilitiesEl = document.getElementById("abilitiesEl");
 const playersEl = document.getElementById("playersOverlay");
 const gameRoomsContainer = document.getElementById("gameRooms");
 export const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", movement1: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", movement1: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
+    "qwerty": {
+        up: "w",
+        down: "s",
+        left: "a",
+        right: "d",
+        movement1: "e",
+        melee1: "Space",
+        range1: "Lb",
+        range2: "q",
+        range3: "c",
+        melee2: "r",
+    },
+    "colemak-dh": {
+        up: "w",
+        down: "r",
+        left: "a",
+        right: "s",
+        movement1: "t",
+        melee1: "Space",
+        range1: "Lb",
+        range2: "q",
+        range3: "f",
+        melee2: "g",
+    },
 };
 export class ElHandler {
     type;

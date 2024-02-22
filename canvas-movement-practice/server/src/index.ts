@@ -124,10 +124,10 @@ class Player implements PlayerType {
         this.name = name;
         this.avatarIndex = avatarIndex;
         this.roomId = roomId;
-        this.x = x; this.hbPaddingX = 25;
-        this.y = y; this.hbPaddingY = 10;
-        this.width = 96; this.hbWidth = 45;
-        this.height = 96; this.hbHeight = 65;
+        this.x = x; this.hbPaddingX = 27;
+        this.y = y; this.hbPaddingY = 20;
+        this.width = 96; this.hbWidth = 41;
+        this.height = 96; this.hbHeight = 55;
         this.keyControls = {
             up: false,
             down: false,
@@ -162,7 +162,7 @@ class Player implements PlayerType {
             movement: { speed: 0, multiplier: 0, },
         }
         this.buffs = {};
-        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0 };
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0, "melee2": 0 };
     }
 
     checkState() {
@@ -344,13 +344,33 @@ class Projectile implements ProjectileType {
     }
 
     move(delta: number) {
+        // if melee update the x and y to the players's location?
+        // so the animation moves with.
+        if (this.abilityProps.isMelee)
+            this.moveMelee();
+        else
+            this.moveRange();
         this.life -= delta;
-        if (this.abilityProps.isMelee || this.abilityProps.type === "utility") return;
-        this.x += Math.cos(this.angle) * this.velocity;
-        this.y += Math.sin(this.angle) * this.velocity;
+    }
 
-        if (isColidingWithEnvironment(OBSTACLES, { x: this.x, y: this.y, width: 16, height: 11 }))
+    moveRange() {
+        this.x += Math.floor(Math.cos(this.angle) * this.velocity);
+        this.y += Math.floor(Math.sin(this.angle) * this.velocity);
+
+        if (isColidingWithEnvironment(OBSTACLES, {
+            x: this.x,
+            y: this.y,
+            width: this.abilityProps.hitbox.up.width,
+            height: this.abilityProps.hitbox.up.height
+        }))
             this.life = 0;
+    }
+
+    moveMelee() {
+        this.x = games[this.roomId].players[this.ownerId].x +
+            games[this.roomId].players[this.ownerId].width / 2
+        this.y = games[this.roomId].players[this.ownerId].y +
+            games[this.roomId].players[this.ownerId].height / 2
     }
 
     isAttackConnecting() {
@@ -386,13 +406,13 @@ class Projectile implements ProjectileType {
                             this.abilityProps.type,
                             this.abilityProps.multiplier
                         );
-                        console.log(this.abilityProps.type);
-                        playerList[p].playerStats.life.current -= dmgDetails.damage;
+                        playerList[p].playerStats.life.current -=
+                            dmgDetails.damage;
+
                         io.to(p).emit("damageTaken", dmgDetails);
                         io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
                     }
                     this.life = 0;
-                    games[this.roomId].players[this.ownerId].abilities[this.name] = 0;
                 }
 
                 if (playerList[p].playerStats.life.current <= 0) {

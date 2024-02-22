@@ -93,6 +93,29 @@ export const isAttackColiding = (p1: PlayerType, p2: PlayerType) => {
 }
 
 export const isColidingWithEnvironment = (map: MapType, player: SquareColisionParams) => {
+    const col = Math.ceil(player.x / TILE_SIZE);
+    const row = Math.ceil(player.y / TILE_SIZE);
+
+    for (let r = row - 1; r <= row + 1; r++) {
+        r = Math.min(map.length - 1, Math.max( 0, r));
+        for (let c = col - 1; c <= col + 1; c++) {
+            c = Math.min(map.length - 1, Math.max( 0, c));
+            if (!map[r][c])
+                continue;
+            if (isSquareColiding(
+                // very specific dimensions to the warrior animation.
+                player,
+                {
+                    x: c * TILE_SIZE,
+                    y: r * TILE_SIZE,
+                    width: TILE_SIZE,
+                    height: TILE_SIZE,
+                },
+            )) return true;
+        }
+    }
+
+    /*
     for (let row = 0; row < map.length; row++) {
         for (let col = 0, rl = map[0].length; col < rl; col++) {
             if (!map[row][col])
@@ -110,6 +133,7 @@ export const isColidingWithEnvironment = (map: MapType, player: SquareColisionPa
         }
     }
     return false;
+    */
 }
 
 type respawnCoordsType = (map: MapType) => { x: number, y: number };

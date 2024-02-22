@@ -6,8 +6,30 @@ const playersEl = document.getElementById("playersOverlay") as HTMLDivElement;
 const gameRoomsContainer = document.getElementById("gameRooms") as HTMLDivElement;
 
 export const keyboardMaps: KeyboardMapsType = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", movement1: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", movement1: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
+    "qwerty": {
+        up: "w",
+        down: "s",
+        left: "a",
+        right: "d",
+        movement1: "e",
+        melee1: "Space",
+        range1: "Lb",
+        range2: "q",
+        range3: "c",
+        melee2: "r",
+    },
+    "colemak-dh": {
+        up: "w",
+        down: "r",
+        left: "a",
+        right: "s",
+        movement1: "t",
+        melee1: "Space",
+        range1: "Lb",
+        range2: "q",
+        range3: "f",
+        melee2: "g",
+    },
 }
 
 export class ElHandler<T extends HTMLElement> {
@@ -219,7 +241,16 @@ export class GameUiHandler {
 }
 
 type LayoutType = {
-    up: string; down: string; left: string; right: string; movement1: string; melee1: string; range1: string; range2: string; range3: string;
+    up: string;
+    down: string;
+    left: string;
+    right: string;
+    movement1: string;
+    melee1: string;
+    range1: string;
+    range2: string;
+    range3: string;
+    melee2: string;
 };
 
 type KeyboardMapsType = {
