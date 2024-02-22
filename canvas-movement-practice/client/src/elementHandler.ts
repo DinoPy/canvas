@@ -1,4 +1,4 @@
-import { BuffKey, BuffType, GameRoomsType, PlayerType } from ".";
+import { AbilitiesType, BuffKey, BuffType, GameRoomsType, PlayerType } from ".";
 import { isNonEmptyObj } from "./utility.js";
 
 const abilitiesEl = document.getElementById("abilitiesEl") as HTMLDivElement;
@@ -6,8 +6,8 @@ const playersEl = document.getElementById("playersOverlay") as HTMLDivElement;
 const gameRoomsContainer = document.getElementById("gameRooms") as HTMLDivElement;
 
 export const keyboardMaps: KeyboardMapsType = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", movement1: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
+    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", movement1: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
 }
 
 export class ElHandler<T extends HTMLElement> {
@@ -84,7 +84,8 @@ export class GameUiHandler {
         if (!isNonEmptyObj<skillElementsType>(this.skillSlotsEls)) return;
         const skillSlotsKeys = Object.keys(this.skillSlotsEls);
         for (let i = 0; i < skillSlotsKeys.length; i++) {
-            const currentKey = skillSlotsKeys[i] as SkillsListType;
+            const currentKey = skillSlotsKeys[i] as AbilitiesType;
+            console.log(keyboardMaps[layout], currentKey);
             this.skillSlotsEls[currentKey]["key"].updateTextContents(keyboardMaps[layout][currentKey].toUpperCase())
         }
     }
@@ -112,15 +113,15 @@ export class GameUiHandler {
         });
     }
 
-    triggerCd(skill: SkillsListType, els: skillElementsType) {
+    triggerCd(skill: AbilitiesType, els: skillElementsType) {
         els[skill]["slot"].addClass("onCd");
         els[skill]["dmg"].removeClass("hidden");
     }
 
-    updateCd(skill: SkillsListType, time: number, els: skillElementsType) {
+    updateCd(skill: AbilitiesType, time: number, els: skillElementsType) {
         els[skill]["dmg"].updateTextContents(time);
     }
-    removeCd(skill: SkillsListType, els: skillElementsType) {
+    removeCd(skill: AbilitiesType, els: skillElementsType) {
         els[skill]["slot"].removeClass("onCd");
         els[skill]["dmg"].addClass("hidden");
     }
@@ -218,7 +219,7 @@ export class GameUiHandler {
 }
 
 type LayoutType = {
-    up: string; down: string; left: string; right: string; dash: string; melee1: string; range1: string; range2: string; range3: string;
+    up: string; down: string; left: string; right: string; movement1: string; melee1: string; range1: string; range2: string; range3: string;
 };
 
 type KeyboardMapsType = {
@@ -226,10 +227,9 @@ type KeyboardMapsType = {
     "colemak-dh": LayoutType;
 }
 
-type SkillsListType = "melee1" | "range1" | "dash" | "range2";
 
 export type skillElementsType = {
-    [key in SkillsListType]: {
+    [key in AbilitiesType]: {
         slot: ElHandler<HTMLDivElement>;
         img: ElHandler<HTMLImageElement>;
         dmg: ElHandler<HTMLSpanElement>;

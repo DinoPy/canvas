@@ -1,5 +1,5 @@
 import { isNonEmptyObj, getMapOffset } from "./utility.js";
-const socket = io("https://3fb7-86-120-249-225.ngrok-free.app");
+const socket = io("http://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
@@ -16,7 +16,7 @@ import { Animation } from "./animationHandler.js";
 const uiHandler = new GameUiHandler(cx);
 uiHandler.setUpSkill("melee1", "./assets/attackIcon.png");
 uiHandler.setUpSkill("range1", "./assets/rangeIcon.png");
-uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
+uiHandler.setUpSkill("movement1", "./assets/dashIcon.png");
 uiHandler.setUpSkill("range2", "./assets/rangeIcon.png");
 uiHandler.setUpSkill("range3", "./assets/rangeIcon.png");
 const els = uiHandler.returnSkillSlots();
@@ -65,7 +65,7 @@ let keyControls = {
     left: false,
     right: false,
     space: false,
-    dash: false,
+    movement1: false,
 };
 let mouseControls = {
     down: false,
@@ -75,7 +75,7 @@ let mouseControls = {
 let isAbilityPressed = {
     melee1: false,
     range1: false,
-    dash: false,
+    movement1: false,
     range2: false,
     range3: false,
 };
@@ -105,8 +105,8 @@ window.addEventListener('keydown', (e) => {
         keyControls.space = true;
         isAbilityPressed.melee1 = true;
     }
-    if (e.key === keyboardMaps[playerLayout].dash && !keyControls.dash) {
-        keyControls.dash = true;
+    if (e.key === keyboardMaps[playerLayout].movement1 && !keyControls.movement1) {
+        keyControls.movement1 = true;
     }
     if (e.key === keyboardMaps[playerLayout].range2 && !isAbilityPressed.range2) {
         isAbilityPressed.range2 = true;
@@ -129,8 +129,8 @@ window.addEventListener('keyup', (e) => {
         isAbilityPressed.melee1;
     }
     ;
-    if (e.key === keyboardMaps[playerLayout].dash)
-        keyControls.dash = false;
+    if (e.key === keyboardMaps[playerLayout].movement1)
+        keyControls.movement1 = false;
     if (ISREADY)
         socket.emit("playerMovement", keyControls);
 });
@@ -190,9 +190,9 @@ images.swiftness.src = "./assets/icons/swiftness.png";
 images.warding.src = "./assets/icons/warding.png";
 const animations = {
     darkPoison: new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64),
-    range3: new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32),
     range1: new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25),
     range2: new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50),
+    range3: new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32),
     flame1: new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600),
     flame2: new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220),
 };
@@ -214,6 +214,7 @@ class Player {
     bulletCount;
     buffs;
     animations;
+    abilities;
     constructor(id, animations, avatarIndex, namee, roomId) {
         this.id = id;
         this.roomId = roomId;
@@ -232,6 +233,7 @@ class Player {
         this.bulletCount = 0;
         this.animations = animations;
         this.buffs = {};
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0 };
     }
     draw(camX, camY, gf) {
         if (this.dash.isDashing) {
@@ -277,7 +279,7 @@ class Player {
                 y: this.y + this.height / 2,
             };
             if (this.id === primaryPlayerId)
-                socket.emit("attack", data);
+                socket.emit("ability", data);
         }
         cx.fillStyle = "rgba(0,0,0,0.2)";
         cx.fillStyle = "lime";
@@ -296,39 +298,54 @@ class Player {
             y: this.y + this.height / 2,
         };
         //socket.emit("shoot", data);
-        socket.emit("attack", data);
+        socket.emit("ability", data);
         mouseControls.down = false;
         isAbilityPressed.range2 = false;
         isAbilityPressed.range3 = false;
     }
     checkDashing() {
-        if (this.id === primaryPlayerId && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
+        if (this.id === primaryPlayerId && keyControls.movement1 && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
-            keyControls.dash = false;
+            socket.emit("ability", { angle: 0, x: 0, y: 0, name: "movement1" });
+            keyControls.movement1 = false;
             this.dash.dashStart = +new Date;
-            uiHandler.triggerCd("dash", els);
+            uiHandler.triggerCd("movement1", els);
+        }
+    }
+    updateCooldowns() {
+        const abilityList = Object.keys(this.abilities);
+        for (let abilityName of abilityList) {
+            const newValue = (this.abilities[abilityName] / 1000).toFixed(1);
+            uiHandler.updateCd(abilityName, parseFloat(newValue), els);
+            if (this.abilities[abilityName] > 0) {
+                uiHandler.triggerCd(abilityName, els);
+            }
+            else {
+                uiHandler.removeCd(abilityName, els);
+            }
         }
     }
     updateUi(gameFrame) {
         if (primaryPlayerId === this.id && gameFrame % 6 === 0) {
+            this.updateCooldowns();
+            /*
             if (!this.dash.isDashing &&
                 this.dash.dashStart + this.dash.cooldown < +new Date) {
-                uiHandler.removeCd("dash", els);
+                uiHandler.removeCd("movement1", els)
+            } else {
+                uiHandler.triggerCd("movement1", els);
+                uiHandler.updateCd("movement1", (this.dash.cooldown / 1000 - Math.floor((+new Date - this.dash.dashStart) / 1000)), els);
             }
-            else {
-                uiHandler.triggerCd("dash", els);
-                uiHandler.updateCd("dash", (this.dash.cooldown / 1000 - Math.floor((+new Date - this.dash.dashStart) / 1000)), els);
-            }
-            if (!this.isAttacking)
-                els["melee1"]["slot"].removeClass("onCd");
-            else
-                els["melee1"]["slot"].addClass("onCd");
+
+            if (!this.isAttacking) els["melee1"]["slot"].removeClass("onCd");
+            else els["melee1"]["slot"].addClass("onCd");
+
             if (this.bulletCount > 0) {
                 els["range1"]["slot"].addClass("onCd");
-            }
-            else {
+            } else {
                 els["range1"]["slot"].removeClass("onCd");
             }
+            */
             const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life, avatarIndex: players[p].avatarIndex }));
             uiHandler.updatePlayers(pls);
             if (isNonEmptyObj(this.buffs)) {
@@ -455,6 +472,7 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
         players[pl[p].id].dash = pl[p].dash;
         players[pl[p].id].bulletCount = pl[p].bulletCount;
         players[pl[p].id].buffs = pl[p].buffs;
+        players[pl[p].id].abilities = pl[p].abilities;
         //players[pl[p].id].playerBuffStats = pl[p].playerBuffStats;
     }
     for (let p in players) {

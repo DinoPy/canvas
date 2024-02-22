@@ -162,7 +162,7 @@ class Player implements PlayerType {
             movement: { speed: 0, multiplier: 0, },
         }
         this.buffs = {};
-        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0};
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0 };
     }
 
     checkState() {
@@ -277,8 +277,8 @@ class Player implements PlayerType {
         }
     }
 
-    decreaseCooldown(delta:number) {
-        for (let abil  in this.abilities) {
+    decreaseCooldown(delta: number) {
+        for (let abil in this.abilities) {
             let a: AbilitiesType = abil as AbilitiesType;
             if (this.abilities[a] > 0)
                 this.abilities[a] = Math.max(this.abilities[a] -= delta, 0);
@@ -286,14 +286,23 @@ class Player implements PlayerType {
     }
 
     static calculateDamage(dealer: Player, receiver: Player, type: "physical" | "magic", attackMultiplier: number) {
-        const offenderCurrentCrit: number = dealer.playerStats.crit.physicalRate + dealer.playerBuffStats.crit.physicalRate;
+        const offenderCurrentCrit: number =
+            dealer.playerStats.crit[`${type}Rate`] +
+            dealer.playerBuffStats.crit[`${type}Rate`];
 
         const isCrit: boolean = Math.random() < offenderCurrentCrit;
 
-        let damage: number = Math.trunc((dealer.playerStats.attack.physical * (dealer.playerStats.attack.physicalMultiplier + dealer.playerBuffStats.attack.physicalMultiplier) + dealer.playerBuffStats.attack.physical) * attackMultiplier);
+        let damage: number = Math.trunc(
+            (dealer.playerStats.attack[type] *
+                (dealer.playerStats.attack[`${type}Multiplier`] +
+                    dealer.playerBuffStats.attack[`${type}Multiplier`]) +
+                dealer.playerBuffStats.attack[type]) *
+            attackMultiplier);
 
         if (isCrit) {
-            const offenderCurrentCritDamage = dealer.playerStats.crit.physicalDamage + dealer.playerBuffStats.crit.physicalDamage;
+            const offenderCurrentCritDamage =
+                dealer.playerStats.crit[`${type}Damage`] +
+                dealer.playerBuffStats.crit[`${type}Damage`];
             damage = Math.trunc(damage + (damage * offenderCurrentCritDamage));
         }
 
@@ -377,6 +386,7 @@ class Projectile implements ProjectileType {
                             this.abilityProps.type,
                             this.abilityProps.multiplier
                         );
+                        console.log(this.abilityProps.type);
                         playerList[p].playerStats.life.current -= dmgDetails.damage;
                         io.to(p).emit("damageTaken", dmgDetails);
                         io.to(this.ownerId).emit("damageDealt", { to: p, ...dmgDetails });
@@ -602,10 +612,9 @@ async function main() {
             player.attack1_alreadyHit = [];
         });
 
-        socket.on("attack", (data) => {
+        socket.on("ability", (data) => {
             const currentGame = games[socket.data.roomId];
             const player = currentGame.players[socket.id];
-            console.log(player.abilities);
             if (player.abilities[data.name] > 0) return;
             currentGame.projectiles.push(
                 new Projectile(

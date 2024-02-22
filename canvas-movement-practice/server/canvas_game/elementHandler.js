@@ -3,8 +3,8 @@ const abilitiesEl = document.getElementById("abilitiesEl");
 const playersEl = document.getElementById("playersOverlay");
 const gameRoomsContainer = document.getElementById("gameRooms");
 export const keyboardMaps = {
-    "qwerty": { up: "w", down: "s", left: "a", right: "d", dash: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
-    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", dash: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
+    "qwerty": { up: "w", down: "s", left: "a", right: "d", movement1: "e", melee1: "Space", range1: "Lb", range2: "q", range3: "c" },
+    "colemak-dh": { up: "w", down: "r", left: "a", right: "s", movement1: "t", melee1: "Space", range1: "Lb", range2: "q", range3: "f" },
 };
 export class ElHandler {
     type;
@@ -69,6 +69,7 @@ export class GameUiHandler {
         const skillSlotsKeys = Object.keys(this.skillSlotsEls);
         for (let i = 0; i < skillSlotsKeys.length; i++) {
             const currentKey = skillSlotsKeys[i];
+            console.log(keyboardMaps[layout], currentKey);
             this.skillSlotsEls[currentKey]["key"].updateTextContents(keyboardMaps[layout][currentKey].toUpperCase());
         }
     }

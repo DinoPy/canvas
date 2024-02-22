@@ -21,7 +21,7 @@ export interface ClientToServerEvents {
     dash: () => void;
     attackMelee1: () => void;
     stopAttacking: (state: "idle" | "run" | "attack") => void;
-    attack: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
+    ability: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
 }
 
 export interface InterServerEvents {

@@ -2,7 +2,7 @@ import { isNonEmptyObj, getMapOffset } from "./utility.js";
 import { Directions } from "./animationHandler.js";
 import { Socket } from "socket.io-client";
 declare var io: any;
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("https://3fb7-86-120-249-225.ngrok-free.app");
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000");
 //***************************************//
 //************** SETUP *****************//
 //***************************************//
@@ -23,7 +23,7 @@ import { Animation } from "./animationHandler.js";
 const uiHandler = new GameUiHandler(cx);
 uiHandler.setUpSkill("melee1", "./assets/attackIcon.png");
 uiHandler.setUpSkill("range1", "./assets/rangeIcon.png");
-uiHandler.setUpSkill("dash", "./assets/dashIcon.png");
+uiHandler.setUpSkill("movement1", "./assets/dashIcon.png");
 uiHandler.setUpSkill("range2", "./assets/rangeIcon.png");
 uiHandler.setUpSkill("range3", "./assets/rangeIcon.png");
 const els = uiHandler.returnSkillSlots() as skillElementsType;
@@ -78,7 +78,7 @@ let keyControls = {
     left: false,
     right: false,
     space: false,
-    dash: false,
+    movement1: false,
 }
 let mouseControls = {
     down: false,
@@ -89,7 +89,7 @@ let mouseControls = {
 let isAbilityPressed = {
     melee1: false,
     range1: false,
-    dash: false,
+    movement1: false,
     range2: false,
     range3: false,
 }
@@ -115,8 +115,8 @@ window.addEventListener('keydown', (e) => {
         keyControls.space = true;
         isAbilityPressed.melee1 = true;
     }
-    if (e.key === keyboardMaps[playerLayout].dash && !keyControls.dash) {
-        keyControls.dash = true;
+    if (e.key === keyboardMaps[playerLayout].movement1 && !keyControls.movement1) {
+        keyControls.movement1 = true;
     }
     if (e.key === keyboardMaps[playerLayout].range2 && !isAbilityPressed.range2) {
         isAbilityPressed.range2 = true;
@@ -131,7 +131,7 @@ window.addEventListener('keyup', (e) => {
     if (e.key === keyboardMaps[playerLayout].down || e.key === "ArrowDown") keyControls.down = false;
     if (e.key === keyboardMaps[playerLayout].right || e.key === "ArrowRight") keyControls.right = false;
     if (e.key === " ") { keyControls.space = false; isAbilityPressed.melee1 };
-    if (e.key === keyboardMaps[playerLayout].dash) keyControls.dash = false;
+    if (e.key === keyboardMaps[playerLayout].movement1) keyControls.movement1 = false;
     if (ISREADY) socket.emit("playerMovement", keyControls);
 
 })
@@ -152,7 +152,7 @@ window.addEventListener('mousemove', (e) => {
 
 document.body.addEventListener("blur", () => {
     Object.keys(keyControls).map(k => {
-        type Keys = "up" | "down" | "left" | "right" | "space" | "dash";
+        type Keys = "up" | "down" | "left" | "right" | "space" | "movement1";
         let key: Keys = k as Keys;
         keyControls[key] = false;
     })
@@ -198,9 +198,9 @@ export type AnimOptionsType = "darkPoison" | "range3" | "flame1" | "flame2" | "r
 export type AnimListType = { [key in AnimOptionsType]: Animation }
 const animations: AnimListType = {
     darkPoison: new Animation(cx, "./assets/Dark VFX 2.png", 15, 5, 48, 64, 48, 64),
-    range3: new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32),
     range1: new Animation(cx, "./assets/arrow.png", 1, 1, 1505, 531, 50, 25),
     range2: new Animation(cx, "./assets/water1.png", 21, 4, 150, 100, 75, 50),
+    range3: new Animation(cx, "./assets/iceSpell.png", 10, 3, 48, 32, 48, 32),
     flame1: new Animation(cx, "./assets/flame1.png", 12, 4, 177.83, 100, 1000, 600),
     flame2: new Animation(cx, "./assets/flame2.png", 11, 4, 142.81, 100, 500, 220),
 }
@@ -220,6 +220,7 @@ class Player implements PlayerType {
     bulletCount: number;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
     animations: { [key: string]: AnimationType };
+    abilities: { [key in AbilitiesType]: number }
 
     constructor(id: string, animations: { [key: string]: AnimationType }, avatarIndex: number, namee: string, roomId: string) {
         this.id = id;
@@ -239,6 +240,7 @@ class Player implements PlayerType {
         this.bulletCount = 0;
         this.animations = animations;
         this.buffs = {};
+        this.abilities = { "melee1": 0, "movement1": 0, "range1": 0, "range2": 0, "range3": 0 };
     }
 
     draw(camX: number, camY: number, gf: number) {
@@ -301,7 +303,7 @@ class Player implements PlayerType {
                 y: this.y + this.height / 2,
             }
             if (this.id === primaryPlayerId)
-                socket.emit("attack", data);
+                socket.emit("ability", data);
         }
         cx.fillStyle = "rgba(0,0,0,0.2)";
         cx.fillStyle = "lime";
@@ -324,7 +326,7 @@ class Player implements PlayerType {
             y: this.y + this.height / 2,
         }
         //socket.emit("shoot", data);
-        socket.emit("attack", data);
+        socket.emit("ability", data);
         mouseControls.down = false;
         isAbilityPressed.range2 = false;
         isAbilityPressed.range3 = false;
@@ -332,23 +334,42 @@ class Player implements PlayerType {
     }
 
     checkDashing() {
-        if (this.id === primaryPlayerId && keyControls.dash && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
+        if (this.id === primaryPlayerId && keyControls.movement1 && !this.dash.isDashing && +new Date - this.dash.dashStart > this.dash.cooldown) {
             socket.emit("dash");
-            keyControls.dash = false;
+            socket.emit("ability", {angle: 0, x: 0, y: 0, name: "movement1"});
+
+            keyControls.movement1 = false;
             this.dash.dashStart = +new Date;
-            uiHandler.triggerCd("dash", els);
+            uiHandler.triggerCd("movement1", els);
         }
 
     }
 
+    updateCooldowns() {
+        const abilityList = Object.keys(this.abilities) as AbilitiesType[];
+        for (let abilityName of abilityList) {
+            const newValue = (this.abilities[abilityName] / 1000).toFixed(1);
+            uiHandler.updateCd(abilityName, parseFloat(newValue), els);
+            if (this.abilities[abilityName] > 0) {
+                uiHandler.triggerCd(abilityName, els);
+            }
+            else {
+                uiHandler.removeCd(abilityName, els);
+            }
+        }
+    }
+
     updateUi(gameFrame: number) {
         if (primaryPlayerId === this.id && gameFrame % 6 === 0) {
+            this.updateCooldowns();
+
+            /*
             if (!this.dash.isDashing &&
                 this.dash.dashStart + this.dash.cooldown < +new Date) {
-                uiHandler.removeCd("dash", els)
+                uiHandler.removeCd("movement1", els)
             } else {
-                uiHandler.triggerCd("dash", els);
-                uiHandler.updateCd("dash", (this.dash.cooldown / 1000 - Math.floor((+new Date - this.dash.dashStart) / 1000)), els);
+                uiHandler.triggerCd("movement1", els);
+                uiHandler.updateCd("movement1", (this.dash.cooldown / 1000 - Math.floor((+new Date - this.dash.dashStart) / 1000)), els);
             }
 
             if (!this.isAttacking) els["melee1"]["slot"].removeClass("onCd");
@@ -359,6 +380,7 @@ class Player implements PlayerType {
             } else {
                 els["range1"]["slot"].removeClass("onCd");
             }
+            */
 
             const pls = Object.keys(players).map(p => ({ name: players[p].name, life: players[p].life, avatarIndex: players[p].avatarIndex }))
             uiHandler.updatePlayers(pls);
@@ -505,6 +527,7 @@ socket.on("playersData", ({ pl, bl, bffs }) => {
         players[pl[p].id].dash = pl[p].dash;
         players[pl[p].id].bulletCount = pl[p].bulletCount;
         players[pl[p].id].buffs = pl[p].buffs;
+        players[pl[p].id].abilities = pl[p].abilities;
         //players[pl[p].id].playerBuffStats = pl[p].playerBuffStats;
     }
 
@@ -698,7 +721,7 @@ export interface ClientToServerEvents {
     stopAttacking: (state: "idle" | "run" | "attack") => void;
     joinRoom: (config: { roomId: string, playerName: string, avatarIndex: number, password: string }) => void;
     createRoom: (data: { name: string, password: string, maxPlayers: number }) => void;
-    attack: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
+    ability: (data: { name: AbilitiesType; x: number; y: number; angle: number }) => void;
 }
 
 export type AbilitiesType = "melee1" | "movement1" | "range1" | "range2" | "range3";
@@ -741,6 +764,7 @@ export interface PlayerType {
     avatarIndex: number;
     bulletCount: number;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: number } } | {};
+    abilities: { [key in AbilitiesType]: number }
 
     draw: (camX: number, camY: number, gf: number) => void;
     showStats: (id: string, camX: number, camY: number) => void;
@@ -772,6 +796,7 @@ export interface PlayerTypeServer {
     playerStats: PlayerStats;
     playerBuffStats: PlayerStats;
     buffs: { [key in BuffKey]: { since: number, name: string, duration: number, tier: 1 | 2 | 3 } } | {};
+    abilities: { [key in AbilitiesType]: number }
 }
 
 export interface BulletType {
